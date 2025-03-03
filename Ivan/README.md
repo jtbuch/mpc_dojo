@@ -1,4 +1,4 @@
-# MPC simulation of catching a nosiy prey
+# MPC simulation of catching a noisy prey
 
 This uses the do-mpc package to simulate an agent catching a prey. 
 
