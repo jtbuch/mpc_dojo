@@ -1,13 +1,13 @@
 # ShittyBird
 
-A fluid dynamics simulation library built on JAX, focused on Lattice Boltzmann Methods.
+A fluid dynamics simulation library built on JAX focused on the Lattice Boltzmann Method.
 
 ## Features
 
 - Efficient Lattice Boltzmann Method (LBM) implementation using JAX
 - Rayleigh-Benard convection simulation capabilities
 - Visualizations of fluid dynamics simulations
-- Built on the core functionality of RLLBM
+- Built on the core functionality of RLLBM (see here: https://github.com/hlasco/rllbm/tree/master)
 
 ## Installation
 
