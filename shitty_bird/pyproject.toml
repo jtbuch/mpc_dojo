@@ -1,0 +1,55 @@
+[tool.poetry]
+name = "shitty_bird"
+version = "0.1.0"
+description = "A library for simulating fluid dynamics using Lattice Boltzmann Method"
+authors = ["Jatan Buch <jb4625@columbia.edu>"]
+readme = "README.md"
+license = "MIT"
+packages = [{include = "shitty_bird", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.12"
+jax = "^0.4.23"
+jaxlib = "^0.4.23"
+chex = "^0.1.7"
+numpy = "^1.26.4"
+matplotlib = "^3.8.3"
+tqdm = "^4.66.2"
+multipledispatch = "^1.0.0"
+moviepy = "^1.0.3"
+rich = "^13.7.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+mypy = "^1.8.0"
+ruff = "^0.2.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+select = ["E", "F", "I"]
+ignore = []
+exclude = [
+    ".git",
+    ".ruff_cache",
+    "__pycache__",
+    "dist",
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+
+[tool.pytest]
+testpaths = ["tests"]

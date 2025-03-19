@@ -1,0 +1,1 @@
+"""ShittyBird test suite."""
