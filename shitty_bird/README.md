@@ -26,6 +26,9 @@ cd shitty_bird
 # Install with Poetry
 poetry install
 
+# To include JAX and related dependencies (recommended)
+poetry install --extras default
+
 # Verify installation by running tests
 poetry run pytest
 ```

@@ -21,7 +21,7 @@ rich = "^13.7.0"
 ipython = {version = ">=7.0.0", optional = true}
 
 [tool.poetry.extras]
-default = ["jax", "jaxlib", "chex"]
+default = ["jax", "jaxlib", "chex", "ipython"]
 notebook = ["ipython"]
 
 [tool.poetry.group.dev.dependencies]
