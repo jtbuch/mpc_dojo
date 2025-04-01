@@ -7,13 +7,16 @@ with different parameters to explore flow regimes.
 """
 
 import argparse
-from shitty_bird.utils.environment import is_in_colab
+
 from shitty_bird.simulations import rayleigh_benard
+from shitty_bird.utils import is_in_colab
 
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Run Rayleigh-Benard convection simulation")
+    parser = argparse.ArgumentParser(
+        description="Run Rayleigh-Benard convection simulation"
+    )
     
     parser.add_argument(
         "--grid", "-g", type=int, default=64,
@@ -53,14 +56,6 @@ def parse_args():
 
 def main():
     """Run the simulation with command line parameters."""
-    # In Colab, use default parameters unless specifically overridden
-    if is_in_colab():
-        # Default to smaller grid for faster execution in Colab
-        import sys
-        if len(sys.argv) == 1:  # No command line arguments provided
-            sys.argv.extend(["--grid", "32", "--steps", "2000"])
-            print("Running in Google Colab with optimized parameters")
-            
     args = parse_args()
     
     print("""
@@ -100,7 +95,7 @@ Environment:      {env}
     # Print final simulation statistics
     sim = result["simulation"]
     final_state = sim.history[-1]
-    print(f"\nSimulation completed:")
+    print("\nSimulation completed:")
     print(f"  Final time: {final_state['time']:.3f}")
     print(f"  Total steps: {final_state['step']}")
     
