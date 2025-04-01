@@ -20,7 +20,7 @@ A fluid dynamics simulation library built on JAX focused on the Lattice Boltzman
 
 ```bash
 # Clone the repository
-git clone https://github.com/jtbuch/shitty_bird.git
+git clone https://github.com/jtbuch/mpc_dojo.git
 cd shitty_bird
 
 # Install with Poetry
