@@ -18,10 +18,11 @@ tqdm = "^4.66.2"
 multipledispatch = "^1.0.0"
 moviepy = "^1.0.3"
 rich = "^13.7.0"
-ipython = "^8.0.0"
+ipython = {version = ">=7.0.0", optional = true}
 
 [tool.poetry.extras]
 default = ["jax", "jaxlib", "chex"]
+notebook = ["ipython"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
