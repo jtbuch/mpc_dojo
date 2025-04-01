@@ -7,12 +7,16 @@ with different parameters to explore flow regimes.
 """
 
 import argparse
+
 from shitty_bird.simulations import rayleigh_benard
+from shitty_bird.utils import is_in_colab
 
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Run Rayleigh-Benard convection simulation")
+    parser = argparse.ArgumentParser(
+        description="Run Rayleigh-Benard convection simulation"
+    )
     
     parser.add_argument(
         "--grid", "-g", type=int, default=64,
@@ -64,6 +68,7 @@ Buoyancy:         {buoyancy}
 Steps:            {steps}
 Save video:       {save_video}
 Random seed:      {seed}
+Environment:      {env}
     """.format(
         grid=args.grid,
         prandtl=args.prandtl,
@@ -71,7 +76,8 @@ Random seed:      {seed}
         buoyancy=args.buoyancy,
         steps=args.steps,
         save_video=not args.no_video,
-        seed=args.seed
+        seed=args.seed,
+        env="Google Colab" if is_in_colab() else "Local"
     ))
     
     # Run the simulation
@@ -89,7 +95,7 @@ Random seed:      {seed}
     # Print final simulation statistics
     sim = result["simulation"]
     final_state = sim.history[-1]
-    print(f"\nSimulation completed:")
+    print("\nSimulation completed:")
     print(f"  Final time: {final_state['time']:.3f}")
     print(f"  Total steps: {final_state['step']}")
     

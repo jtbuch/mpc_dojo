@@ -20,11 +20,14 @@ A fluid dynamics simulation library built on JAX focused on the Lattice Boltzman
 
 ```bash
 # Clone the repository
-git clone https://github.com/jtbuch/shitty_bird.git
+git clone https://github.com/jtbuch/mpc_dojo.git
 cd shitty_bird
 
 # Install with Poetry
 poetry install
+
+# To include JAX and related dependencies (recommended)
+poetry install --extras default
 
 # Verify installation by running tests
 poetry run pytest
@@ -34,6 +37,26 @@ If you encounter any dependency issues, specifically with IPython, you can insta
 
 ```bash
 poetry add ipython@^8.0.0
+```
+
+### Google Colab Support
+
+ShittyBird includes special handling for Google Colab environments. When running in Colab:
+
+1. The package will automatically detect JAX, JAXLIB, and other core dependencies that are pre-installed in Colab
+2. Examples will use optimized parameters suitable for Colab's environment
+3. To use in a Colab notebook:
+
+```python
+# Clone the repository
+!git clone https://github.com/jtbuch/shitty_bird.git
+%cd shitty_bird
+
+# Install with pip (Poetry not required in Colab)
+!pip install -e .
+
+# Run examples
+%run examples/rayleigh_benard_simulation.py
 ```
 
 ## Quick Start
