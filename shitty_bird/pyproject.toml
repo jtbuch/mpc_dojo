@@ -9,9 +9,9 @@ packages = [{include = "shitty_bird", from = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
-jax = "^0.4.23"
-jaxlib = "^0.4.23"
-chex = "^0.1.7"
+jax = {version = "^0.4.23", optional = true}
+jaxlib = {version = "^0.4.23", optional = true}
+chex = {version = "^0.1.7", optional = true}
 numpy = "^1.26.4"
 matplotlib = "^3.8.3"
 tqdm = "^4.66.2"
@@ -19,6 +19,9 @@ multipledispatch = "^1.0.0"
 moviepy = "^1.0.3"
 rich = "^13.7.0"
 ipython = "^8.0.0"
+
+[tool.poetry.extras]
+default = ["jax", "jaxlib", "chex"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
