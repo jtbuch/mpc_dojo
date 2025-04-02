@@ -3,6 +3,12 @@
 __version__ = "0.1.0"
 
 # Skip package installation if in Google Colab and packages are already installed
+# Make subpackages available at the top level
+from . import (
+    core,  # noqa: F401
+    simulations,  # noqa: F401
+    utils,  # noqa: F401
+)
 from .utils.environment import get_missing_packages, is_in_colab
 
 REQUIRED_JAX_PACKAGES = ["jax", "jaxlib", "chex"]
