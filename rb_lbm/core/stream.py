@@ -6,10 +6,10 @@ import chex
 
 from jax import numpy as jnp
 
-from shitty_bird.core.lbm.lattice import Lattice, CoupledLattices
+from .lattice import Lattice, CoupledLattices
 
 if TYPE_CHECKING:
-    from shitty_bird.core.lbm.simulation import LBMState
+    from .simulation import LBMState
 
 __all__ = ["stream"]
 

@@ -9,10 +9,10 @@ import jax
 from jax import jit
 from jax import numpy as jnp
 
-from shitty_bird.core.lbm.lattice import Lattice, CoupledLattices
-from shitty_bird.core.lbm.collisions import collide
-from shitty_bird.core.lbm.boundary import Boundary, BoundaryDict, apply_boundary_conditions
-from shitty_bird.core.lbm.stream import stream
+from .lattice import Lattice, CoupledLattices
+from .collisions import collide
+from .boundary import Boundary, BoundaryDict, apply_boundary_conditions
+from .stream import stream
 
 __all__ = ["Domain", "Simulation", "LBMState"]
 

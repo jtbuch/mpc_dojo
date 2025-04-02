@@ -11,10 +11,10 @@ import chex
 import jax
 from jax import numpy as jnp
 
-from shitty_bird.core.lbm.stencil import Stencil
+from .stencil import Stencil
 
 if TYPE_CHECKING:
-    from shitty_bird.core.lbm.simulation import LBMState
+    from .simulation import LBMState
 
 __all__ = ["Lattice", "FluidLattice", "ThermalFluidLattice"]
 

@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Any
 import jax
 import jax.numpy as jnp
 import numpy as np
-from shitty_bird.core import lbm
+import core as lbm
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -15,7 +15,7 @@ from tqdm.rich import trange
 import warnings
 from tqdm import TqdmExperimentalWarning
 
-from ..utils.visualization import fig_constructor, fig_updater, plot_state
+from utils.visualization import fig_constructor, fig_updater, plot_state
 
 warnings.filterwarnings("ignore", category=TqdmExperimentalWarning)
 

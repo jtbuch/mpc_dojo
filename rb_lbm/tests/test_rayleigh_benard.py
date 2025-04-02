@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from shitty_bird.simulations.rayleigh_benard import RayleighBenardSimulation, get_diagnostics
+from simulations.rayleigh_benard import RayleighBenardSimulation, get_diagnostics
 
 
 def test_rayleigh_benard_init():

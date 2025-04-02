@@ -10,10 +10,10 @@ import chex
 from jax import numpy as jnp
 from jax.tree_util import register_pytree_node_class
 
-from shitty_bird.core.lbm.lattice import Lattice, CoupledLattices
+from .lattice import Lattice, CoupledLattices
 
 if TYPE_CHECKING:
-    from shitty_bird.core.lbm.simulation import LBMState
+    from .simulation import LBMState
 
 __all__ = [
     "BounceBackBoundary",
