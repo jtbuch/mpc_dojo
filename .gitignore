@@ -2,3 +2,4 @@
 Ivan/MPC_RL_Cartpole/Results/Videos/*
 Ivan/MPC_RL_Cartpole/Results/PerformanceResults/*
 *.mp4
+.DS_Store
