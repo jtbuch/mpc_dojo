@@ -149,7 +149,7 @@ def evaluate_rl_models(rl_train_steps, results_folder="Results/PerformanceResult
     dqn_lengths = _evaluate_rl_model(dqn_model, "dqn", num_episodes, noise_scale, seed, video_dir, rl_train_steps)
 
     # Save results
-    noise_str = str(noise_scale).replace(' ', '_').replace('.', '_')
+    noise_str = str(noise_scale).replace('', '_')
     np.savetxt(f"{results_folder}/ppo_episode_lengths_steps_{rl_train_steps}_noise_{noise_str}.csv", ppo_lengths, delimiter=",")
     np.savetxt(f"{results_folder}/dqn_episode_lengths_steps_{rl_train_steps}_noise_{noise_str}.csv", dqn_lengths, delimiter=",")
     return ppo_lengths, dqn_lengths
@@ -212,7 +212,7 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="Resu
                     length += 1
                 results[key].append(length)
                 env.close()
-            noise_str = str(noise_scale).replace(' ', '_').replace('.', '_')
+            noise_str = str(noise_scale).replace('', '_')
             np.savetxt(f"{results_folder}/mpc_episode_lengths_{key}_noise_{noise_str}.csv", results[key], delimiter=",")
     return results
 
@@ -247,7 +247,7 @@ def evaluate_lqr_controller(results_folder="Results/PerformanceResults/", num_ep
             length += 1
         lengths.append(length)
         env.close()
-    noise_str = str(noise_scale).replace(' ', '_').replace('.', '_')
+    noise_str = str(noise_scale).replace('', '_')
     np.savetxt(f"{results_folder}/lqr_episode_lengths_{key}_noise_{noise_str}.csv", lengths, delimiter=",")
     return {key: lengths}
 
@@ -343,7 +343,7 @@ def analyze_performance_results(results_folder="Results/PerformanceResults/",
     
     # Save and show plot
     os.makedirs(results_folder, exist_ok=True)
-    noise_str = noise_str.replace('.', '_').replace('[', '').replace(']', '')
+    noise_str = noise_str.replace('', '_')
     fig.savefig(os.path.join(results_folder, f"mean_episode_lengths_noise_{noise_str}.png"), bbox_inches="tight", dpi=300)
     plt.tight_layout()
     plt.show()
