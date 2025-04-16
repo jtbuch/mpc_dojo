@@ -1,5 +1,4 @@
 import numpy as np
-import itertools
 
 class WorldModel:
     """ What the bird thinks."""
@@ -12,7 +11,7 @@ class WorldModel:
 
 class World:
     """ The way life actually is. The bird falls down unless it flaps."""
-    def __init__(self, x_size, y_size, z_size, wind=[0.2, 0.0, 0.0]):
+    def __init__(self, x_size, y_size, z_size, wind=[0.0, 0.0, 0.0]):
         # Gridworld dimensions
         self.x_size = x_size
         self.y_size = y_size
@@ -199,11 +198,14 @@ class ShittyBird:
             # Sample a next state and reward from the model
             next_state, next_reward = self.transition_model(state, action)
 
+            # Get the next action for doing a SARSA update
+            next_action = self.policy(next_state)
+
             # Update Q-values based on the sampled transition
-            self.SARSA_update(state, action, reward, next_state, action)
+            self.SARSA_update(state, action, reward, next_state, next_action)
 
             # Cycle
-            state, reward = next_state, next_reward
+            state, reward, action = next_state, next_reward, next_action
 
     # ---------------- Misc. methods ------------------
     def rollout(self, time_steps):

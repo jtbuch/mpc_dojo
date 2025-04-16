@@ -14,8 +14,8 @@ def simulate(bird, world, n_episodes, time_steps, train=False):
         for t in range(time_steps):
             # Transition state, get bird action and reward
             next_state  = world.transition(state, action)
-            next_action = bird.policy(next_state)
             reward      = world.reward(next_state)
+            next_action = bird.policy(next_state)
 
             # Learning
             if train: bird.update(state, action, reward, next_state, next_action)
@@ -28,24 +28,21 @@ if __name__ == "__main__":
     plt.close('all')
 
     # Create environment
-    world = World(x_size = 4, y_size = 4, z_size = 5, wind = [0.0, 0.0, 0.0])
+    world = World(x_size = 5, y_size = 3, z_size = 5, wind = [0.2, 0.0, 0.0])
 
-    # Create the bird
-    bird = ShittyBird(n_states = world.n_states, n_actions = world.n_actions, n_planning = 5, update_type='SARSA')
-    bird.init_transition_model(world)
+    # Create the bird and a world model for the bird
+    bird = ShittyBird(n_states = world.n_states, n_actions = world.n_actions, n_planning = 1000, update_type='Dyna')
+    bad_model = World(x_size = 5, y_size = 3, z_size = 5, wind = [0.0, 0.0, 0.0])
+    bird.init_transition_model(bad_model)
 
     # Save the initial q_values
     q_values_prior = bird.action_values.flatten()
 
     # Train the bird
-    simulate(bird, world, n_episodes=1000, time_steps=1000, train=True)
+    simulate(bird, world, n_episodes=1000, time_steps=1, train=True)
 
     # Save the final q_values
     q_values_post = bird.action_values.flatten()
 
-    # Plot the birds state-action values
-    values = unroll_action_values(bird, world)
-    argmax_policy = np.argmax(values, axis=3)
-    for z in range(world.z_size):
-        plot_symbol_grid(argmax_policy[:,:,z])
-        plt.title("Bird Policy at z={}".format(z))
+    # Plot action values
+    plot_action_values(bird, world)
