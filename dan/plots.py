@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 import numpy as np
 
-from utils import unroll_action_values
+from utils import *
 
 def plot_policy():
     pass
@@ -65,3 +65,77 @@ def plot_symbol_grid(arr):
     # Make cells square
     plt.gca().set_aspect('equal', adjustable='box')
     plt.show()
+
+def plot_flight_trajectory(hist, world, episode=0):
+    """
+    Plots the flight trajectory of the bird in 3D space.
+    The trajectory is plotted as a line in 3D space..
+    """
+    # Get number of time steps, coordinates over time
+    n_steps = hist.shape[1]
+    coords, _ = convert_hist_to_coords(hist, world, episode)
+
+    # Plot the trajectory
+    fig = plt.figure()
+    ax  = fig.add_subplot(111, projection='3d')
+    jitter_scale = 0.1
+    jitter = np.random.uniform(-jitter_scale, jitter_scale, [n_steps, 3])
+    points = coords + jitter
+
+    # Get color from blue to red representing time
+    cmap = plt.get_cmap('coolwarm')
+    norm = plt.Normalize(0, n_steps)
+    colors = cmap(norm(np.arange(n_steps)))
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=colors, marker='o')
+    # Plot the trajectory line segments in average color
+    for t in range(n_steps - 1):
+        color = np.mean(colors[t:t+2], axis=0)
+        ax.plot(points[t:t+2, 0], points[t:t+2, 1], points[t:t+2, 2], color=color)    
+
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_zlabel('Z-axis')
+    ax.set_title('Flight trajectory of the bird')
+    plt.show()
+
+
+def plot_state_occupancy_heatmap(hist, world, episode=-1):
+    """
+    Plots the state occupancy heatmap of the bird.
+    The heatmap is plotted as a stack of 2D heatmaps.
+    """
+    n_steps = hist.shape[1]
+    coords, _ = convert_hist_to_coords(hist, world, episode)
+    occupancy = np.zeros((world.x_size, world.y_size, world.z_size))
+    for t in range(n_steps):
+        x, y, z = coords[t, :]
+        occupancy[x, y, z] += 1
+
+    # Normalize occupancy to [0, 1]
+    occupancy /= np.max(occupancy)
+
+    for z in range(world.z_size):
+        plt.figure()
+        
+        # Plot the heatmap
+        plt.imshow(occupancy[:, :, z].T, cmap='coolwarm', interpolation='none')
+        plt.clim(0, 1)
+
+        # Plot grid of cell outlines
+        num_cols, num_rows = occupancy[:,:,z].shape
+        for i in range(num_rows + 1):
+            plt.hlines(y=i-0.5, xmin=-0.5, xmax=num_cols-0.5, color='black')
+        
+        for j in range(num_cols + 1):
+            plt.vlines(x=j-0.5, ymin=-0.5, ymax=num_rows-0.5, color='black')
+
+        # Print occupancy fractions in cells
+        for i in range(num_rows):
+            for j in range(num_cols):
+                val = occupancy[j, i, z]
+                plt.text(j, i, "{:.2f}".format(val), ha='center', va='center', fontsize=10, color='white')
+
+        plt.xticks([])
+        plt.yticks([])
+
+        plt.title("Bird Occupancy at z={}".format(z))

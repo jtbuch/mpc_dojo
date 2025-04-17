@@ -107,7 +107,102 @@ class World:
 
         return reward
         
-class ShittyBird:
+class MPCShittyBird:
+    """ Doesn't aspire to much. """
+    def __init__(self, n_actions, recompute = 10):
+        # Model parameters
+        self.n_actions = n_actions      # Number of actions available
+        self.recompute = recompute      # How often to recompute the control trajectory
+        self.control_trajectory = None  # Stores cached control inputs
+        self.control_step = 0           # Current step in the control trajectory
+
+        # Trajectory search parameters, probably shouldn't be here...
+        self.n_planning     = 10        # Number of planning steps
+        self.planning_width = 5         # Number of trajectories to sample
+        self.epsilon        = 0.2       # Epsilon greedy action selection                
+
+    def init_transition_model(self, world):
+        """  """
+        self.world_transition = world.transition
+        self.world_reward     = world.reward
+
+    def transition_model(self, state, action):
+        """ Bird's model of the world's transition structure. """
+        next_state = self.world_transition(state, action)
+        reward     = self.world_reward(next_state)
+        return next_state, reward
+    
+    def policy(self, state):
+        """ Could implement better policies here. """
+
+        # Only occasionally recompute stored policy (really, control trajectory)
+        if self.control_step % self.recompute == 0:
+            self.control_trajectory = self.get_forward_policy(state)
+
+        # Return the first action in the control trajectory
+        return self.control_trajectory[self.control_step]
+
+    def register_action(self):
+        """ Register that an action has been taken. """
+        self.control_step += 1
+        self.control_step %= self.recompute
+
+    def get_forward_policy(self, state):
+        """
+        Get the policy looking forward from a state.
+        Currently implemented as epsilon-greedy-n-step-lookahead
+        """
+
+        # Generate a set of trajectories to compare
+        trajectories = []
+        for i in range(self.planning_width):
+            trajectories.append(self.epsilon_greedy_n_step_lookahead(state))
+        
+        # Select the most rewarding trajectory
+        cumulative_rewards = [np.sum(t[2,:]) for t in trajectories]
+        best_trajectory = trajectories[np.argmax(cumulative_rewards)]
+
+        # Return the best policy from this state forward
+        return best_trajectory[0, :]
+
+    def update(self, state, action, reward, next_state, next_action):
+        """ Compatibility method for now. """
+        pass
+
+    def epsilon_greedy_n_step_lookahead(self, state):
+        
+        # Initialize memory for a trajectory
+        trajectory = np.zeros([3, self.n_planning], dtype=int)
+        
+        # Loop over planning steps filling out trajectory
+        for step in range(self.n_planning):
+            
+            # Initialize a memory for planning
+            planning_cache = np.zeros([2, self.n_actions])
+
+            for action in range(self.n_actions):
+                # Determine the outcome of this action
+                next_state, reward = self.transition_model(state, action)
+                
+                # Save what we see
+                planning_cache[0, action] = next_state
+                planning_cache[1, action] = reward
+
+            # Get the epsilon-greedy action
+            if np.random.rand() < self.epsilon:
+                best_action = np.random.randint(self.n_actions)
+            else:
+                best_action = np.argmax(planning_cache[1, :])
+    
+            # Save the best action, state, and reward
+            trajectory[0, step] = best_action
+            trajectory[1, step] = planning_cache[0, best_action]    # Best state
+            trajectory[2, step] = planning_cache[1, best_action]    # Best reward
+
+        return trajectory
+
+
+class RLShittyBird:
     """ Aspires to be better. """
     def __init__(self, n_states, n_actions, n_planning=1000, update_type='SARSA'):
         # Bird parameters
@@ -207,17 +302,7 @@ class ShittyBird:
             # Cycle
             state, reward, action = next_state, next_reward, next_action
 
-    # ---------------- Misc. methods ------------------
-    def rollout(self, time_steps):
-        """ Produces a trajectory given a policy. """
-        if self.model is None:
-            raise ValueError("Model not set. Cannot rollout.")
-        
-        # Rollout the model for a given policy
-        state_list = []
-        for t in range(time_steps):
-            state = self.model.predict(state, self.policy(state))
-            state_list.append(state)
-            # TODO: add reward list
-
-        return state_list
+    # ---------------- Misc ------------------
+    def register_action(self):
+        """ Register that an action has been taken (compatibility method) """
+        pass
