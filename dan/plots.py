@@ -103,8 +103,8 @@ def plot_flight_trajectory(hist, world, episode=0):
 
 def plot_state_occupancy_heatmap(hist, world, episode=-1):
     """
-    Plots the state occupancy heatmap of the bird.
-    The heatmap is plotted as a stack of 2D heatmaps.
+    Plots the state occupancy heatmap of the bird for all z slices in a single figure.
+    The heatmap is plotted as a vertical stack of 2D heatmaps.
     """
     n_steps = hist.shape[1]
     coords, _ = convert_hist_to_coords(hist, world, episode)
@@ -116,28 +116,30 @@ def plot_state_occupancy_heatmap(hist, world, episode=-1):
     # Normalize occupancy to [0, 1]
     occupancy /= np.max(occupancy)
 
-    for z in range(world.z_size):
-        plt.figure()
-        
-        # Plot the heatmap
-        plt.imshow(occupancy[:, :, z].T, cmap='coolwarm', interpolation='none')
-        plt.clim(0, 1)
+    n_rows = int(np.ceil(world.z_size))
+    fig, axs = plt.subplots(n_rows, 1, figsize=(3, 2 * n_rows))
+    axs = np.atleast_1d(axs)  # ensures axs is always iterable
+
+    for z, ax in zip(reversed(range(world.z_size)), axs):
+        im = ax.imshow(occupancy[:, :, z].T, cmap='coolwarm', interpolation='none', vmin=0, vmax=1)
 
         # Plot grid of cell outlines
-        num_cols, num_rows = occupancy[:,:,z].shape
+        num_cols, num_rows = occupancy[:, :, z].shape
         for i in range(num_rows + 1):
-            plt.hlines(y=i-0.5, xmin=-0.5, xmax=num_cols-0.5, color='black')
-        
+            ax.hlines(y=i - 0.5, xmin=-0.5, xmax=num_cols - 0.5, color='black')
         for j in range(num_cols + 1):
-            plt.vlines(x=j-0.5, ymin=-0.5, ymax=num_rows-0.5, color='black')
+            ax.vlines(x=j - 0.5, ymin=-0.5, ymax=num_rows - 0.5, color='black')
 
         # Print occupancy fractions in cells
         for i in range(num_rows):
             for j in range(num_cols):
                 val = occupancy[j, i, z]
-                plt.text(j, i, "{:.2f}".format(val), ha='center', va='center', fontsize=10, color='white')
+                ax.text(j, i, "{:.2f}".format(val), ha='center', va='center', fontsize=10, color='white')
 
-        plt.xticks([])
-        plt.yticks([])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(f"Bird Occupancy at z={z}")
+        ax.set_aspect('equal', adjustable='box')
 
-        plt.title("Bird Occupancy at z={}".format(z))
+    plt.tight_layout()
+    plt.show()
