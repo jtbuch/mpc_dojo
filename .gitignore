@@ -1,5 +1,6 @@
 *__pycache__*
 Ivan/MPC_RL_Cartpole/Results/Videos/*
 Ivan/MPC_RL_Cartpole/Results/PerformanceResults/*
+Ivan/MPC_RL_Cartpole/Results/TrainedModels/*
 *.mp4
 .DS_Store
