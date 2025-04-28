@@ -67,12 +67,96 @@ class MPCController:
             't_step': self.dt,
             'n_robust': 0,
             'state_discretization': 'discrete' if self.linear else 'collocation',
+            'discretization': 'euler' if self.linear else None,
             'collocation_type': 'radau' if not self.linear else None,
             'collocation_deg': 2 if not self.linear else None,
             'collocation_ni': 1 if not self.linear else None,
             'store_full_solution': False,
         }
         self.mpc.set_param(**{k: v for k, v in setup_mpc.items() if v is not None})
+        
+       
+        self.mpc.set_objective(mterm=theta**2 + x**2, lterm=theta**2 + x**2 + 0.01*u**2)
+        self.mpc.bounds['lower','_u','u'] = -self.force_mag
+        self.mpc.bounds['upper','_u','u'] = self.force_mag
+        
+        self.mpc.setup()
+
+    def get_action(self, obs):
+        self.mpc.x0 = np.array(obs).reshape(-1, 1)
+        self.mpc.set_initial_guess()
+        u_opt = self.mpc.make_step(self.mpc.x0)
+        return float(u_opt[0])
+
+class MPCControllerRandSampler:
+    def __init__(self, horizon=10, dt=0.02, linear=False, recompute_every=1):
+        self.horizon = horizon
+        self.dt = dt
+        self.linear = linear  # New parameter
+        self.recompute_every = recompute_every
+        self.force_mag = 10.0
+        self.gravity = 9.8
+        self.masscart = 1.0
+        self.masspole = 0.1
+        self.length = 0.5
+        self.total_mass = self.masscart + self.masspole
+        self.polemass_length = self.masspole * self.length
+
+        # Define model
+        model_type = "continuous"
+        self.model = do_mpc.model.Model(model_type)
+        
+        x = self.model.set_variable(var_type='_x', var_name='x', shape=(1,1))
+        x_dot = self.model.set_variable(var_type='_x', var_name='x_dot', shape=(1,1))
+        theta = self.model.set_variable(var_type='_x', var_name='theta', shape=(1,1))
+        theta_dot = self.model.set_variable(var_type='_x', var_name='theta_dot', shape=(1,1))
+        u = self.model.set_variable(var_type='_u', var_name='u', shape=(1,1))
+        
+        if self.linear:
+            # Linearized dynamics (θ ≈ 0)
+            temp = u / self.total_mass  # Ignore θ_dot² term
+            thetaacc = (self.gravity * theta - temp) / (
+                self.length * (4.0/3.0 - self.masspole/self.total_mass)
+            )
+            xacc = temp - self.polemass_length * thetaacc / self.total_mass
+        else:
+            # Original nonlinear dynamics
+            costheta = np.cos(theta)
+            sintheta = np.sin(theta)
+            temp = (u + self.polemass_length * theta_dot**2 * sintheta) / self.total_mass
+            thetaacc = (self.gravity * sintheta - costheta * temp) / (
+                self.length * (4.0/3.0 - self.masspole * costheta**2 / self.total_mass)
+            )
+            xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+        
+        self.model.set_rhs('x', x_dot)
+        self.model.set_rhs('x_dot', xacc)
+        self.model.set_rhs('theta', theta_dot)
+        self.model.set_rhs('theta_dot', thetaacc)
+        
+        self.model.setup()
+        
+        # Configure MPC based on linearity
+        self.mpc = do_mpc.controller.MPC(self.model)
+        setup_mpc = {
+            'n_horizon': self.horizon,
+            't_step': self.dt,
+            'n_robust': 0,
+            'state_discretization': 'discrete' if self.linear else 'collocation',
+            'store_full_solution': False,
+        }
+        if self.linear:
+            setup_mpc['discretization'] = 'euler'  # Explicit Euler for linear
+        else:
+            # Collocation settings only for nonlinear
+            setup_mpc.update({
+                'collocation_type': 'radau',
+                'collocation_deg': 2,
+                'collocation_ni': 1,
+            })
+        
+        self.mpc.set_param(**setup_mpc)  # No need to filter None now
+        
        
         self.mpc.set_objective(mterm=theta**2 + x**2, lterm=theta**2 + x**2 + 0.01*u**2)
         self.mpc.bounds['lower','_u','u'] = -self.force_mag
@@ -131,7 +215,7 @@ class LQRController:
         return float(u[0, 0])
 
 
-def evaluate_rl_models(rl_train_steps, results_folder="Results/PerformanceResults/", 
+def evaluate_rl_models(rl_train_steps,models_folder = "Results/Trained_Models", results_folder="Results/PerformanceResults/", 
                        num_episodes=20, noise_scale=None, seed=42):
     """Evaluate PPO and DQN models under noise."""
     if noise_scale is None:
@@ -141,12 +225,12 @@ def evaluate_rl_models(rl_train_steps, results_folder="Results/PerformanceResult
     os.makedirs(video_dir, exist_ok=True)
 
     # Load models
-    ppo_model = PPO.load(f"{results_folder}/ppo_cartpole_model_training_steps_{rl_train_steps}")
-    dqn_model = DQN.load(f"{results_folder}/dqn_cartpole_model_training_steps_{rl_train_steps}")
+    ppo_model = PPO.load(f"{models_folder}/ppo_cartpole_model_training_steps_{rl_train_steps}")
+    dqn_model = DQN.load(f"{models_folder}/dqn_cartpole_model_training_steps_{rl_train_steps}")
 
     # Evaluate
-    ppo_lengths = _evaluate_rl_model(ppo_model, "ppo", num_episodes, noise_scale, seed, video_dir, rl_train_steps)
-    dqn_lengths = _evaluate_rl_model(dqn_model, "dqn", num_episodes, noise_scale, seed, video_dir, rl_train_steps)
+    ppo_lengths = evaluate_rl_model(ppo_model, "ppo", num_episodes, noise_scale, seed, video_dir, rl_train_steps)
+    dqn_lengths = evaluate_rl_model(dqn_model, "dqn", num_episodes, noise_scale, seed, video_dir, rl_train_steps)
 
     # Save results
     noise_str = str(noise_scale).replace('', '_')
@@ -154,7 +238,7 @@ def evaluate_rl_models(rl_train_steps, results_folder="Results/PerformanceResult
     np.savetxt(f"{results_folder}/dqn_episode_lengths_steps_{rl_train_steps}_noise_{noise_str}.csv", dqn_lengths, delimiter=",")
     return ppo_lengths, dqn_lengths
 
-def _evaluate_rl_model(model, model_name, num_episodes, noise_scale, seed, video_dir, rl_train_steps):
+def evaluate_rl_model(model, model_name, num_episodes, noise_scale, seed, video_dir, rl_train_steps):
     """Helper to evaluate a single RL model."""
     episode_lengths = []
     for episode in range(num_episodes):
@@ -179,7 +263,7 @@ def _evaluate_rl_model(model, model_name, num_episodes, noise_scale, seed, video
     return episode_lengths
 
 def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="Results/PerformanceResults/", 
-                             num_episodes=20, noise_scale=None, seed=42, linear=True):
+                             num_episodes=20, noise_scale=None, seed=42, linear=True, controller_type="mpc_with_model"):
     """Evaluate MPC with various horizons and recompute intervals."""
     if noise_scale is None:
         noise_scale = np.array([0.5, 0.5, 0.05, 0.05])
@@ -191,7 +275,10 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="Resu
         for e in recompute_intervals:
             key = f"h_{h}_e_{e}"
             results[key] = []
-            mpc = MPCController(horizon=h, recompute_every=e, linear=linear)
+            if controller_type == "mpc_with_model":
+                mpc = MPCController(horizon=h, recompute_every=e, linear=linear)
+            elif controller_type == "mpc_rand_sampler":
+                mpc = MPCControllerRandSampler(horizon=h, recompute_every=e, linear=linear)
             for ep in range(num_episodes):
                 if ep == 0:
                     env = gym.make("CartPole-v1", render_mode="rgb_array")
@@ -213,6 +300,10 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="Resu
                 results[key].append(length)
                 env.close()
             noise_str = str(noise_scale).replace('', '_')
+            if controller_type == "mpc_with_model":
+                np.savetxt(f"{results_folder}/mpc_episode_lengths_{key}_noise_{noise_str}.csv", results[key], delimiter=",")
+            elif controller_type == "mpc_rand_sampler": 
+                np.savetxt(f"{results_folder}/mpcRand_episode_lengths_{key}_noise_{noise_str}.csv", results[key], delimiter=",")
             np.savetxt(f"{results_folder}/mpc_episode_lengths_{key}_noise_{noise_str}.csv", results[key], delimiter=",")
     return results
 
@@ -279,7 +370,7 @@ def analyze_performance_results(results_folder="Results/PerformanceResults/",
     # Adjust model specifications
     for i, result in enumerate(results):
         if result[0] in ["dqn", "ppo"]:
-            results[i][1] = result[1][3]
+            results[i][1] = result[1][1]
         else:
             results[i][1] = "_".join(result[1][:])
     
