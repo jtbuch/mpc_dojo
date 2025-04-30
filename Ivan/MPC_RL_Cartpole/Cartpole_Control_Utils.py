@@ -504,7 +504,7 @@ def analyze_performance_results_errors(results_folder="Results/PerformanceResult
     Reads CSV files from the given results folder, filters by noise scale, 
     calculates mean and standard deviation of episode lengths, and plots the results.
     """
-    
+
     # Get all CSV files
     files = [file for file in os.listdir(results_folder) if file.endswith(".csv")]
     
@@ -517,8 +517,16 @@ def analyze_performance_results_errors(results_folder="Results/PerformanceResult
     
     results = []
     for file in files:
+        # get the episode length data
+        file_episode_length = file.replace("integrated_errors", "episode_lengths")
+        # if file_episode_length contains "dqn" or "ppo", at the end of "integrated_errors" add "steps"
+        if "dqn" in file or "ppo" in file:
+            file_episode_length = file_episode_length.replace("episode_lengths", "episode_lengths_steps")
+        data_episode_length = np.loadtxt(os.path.join(results_folder, file_episode_length), delimiter=",")
         data = np.loadtxt(os.path.join(results_folder, file), delimiter=",")
         data = data[:, 0]
+        # divide the data by the episode length data
+        # data = (data / data_episode_length)*10
         mean = np.mean(data)
         std = np.std(data)
         model_name = file[:3]
@@ -536,8 +544,8 @@ def analyze_performance_results_errors(results_folder="Results/PerformanceResult
     # Sort results
     results.sort(key=lambda x: (x[0] != "mpc", x[0]))
     
-    # Create DataFrame
-    df = pd.DataFrame(results, columns=["Model", "Specification", "Squared Integrated Error", "Standard Deviation"])
+        # Create DataFrame
+    df = pd.DataFrame(results, columns=["Model", "Specification", "Mean Episode Length", "Standard Deviation"])
     df[['Horizon', 'Recompute']] = df['Specification'].str.extract(r'h_(\d+)_e_(\d+)').astype('Int64')
     df = df.sort_values(['Horizon', 'Recompute']).reset_index(drop=True)
     
@@ -560,8 +568,10 @@ def analyze_performance_results_errors(results_folder="Results/PerformanceResult
                      label=str(recompute), color=cmap_mpc(norm_mpc(recompute)), marker='o', capsize=4, linestyle='--')
     ax1.set_title('MPC Performance')
     ax1.set_xlabel('Horizon')
-    ax1.set_ylabel('Mean Episode Length (± SD)')
+    ax1.set_ylabel('Sum of Squared Errors (± SD)')
     ax1.legend(title='Recompute')
+    # set y limits
+    # ax1.set_ylim(0, 5)
     
     # RL Models Plot
     other_df['Specification'] = pd.to_numeric(other_df['Specification'])
@@ -594,7 +604,7 @@ def analyze_performance_results_errors(results_folder="Results/PerformanceResult
     # Save and show plot
     os.makedirs(results_folder, exist_ok=True)
     noise_str = noise_str.replace('', '_')
-    fig.savefig(os.path.join(results_folder, f"mean_errors_noise_{noise_str}.png"), bbox_inches="tight", dpi=300)
+    fig.savefig(os.path.join(results_folder, f"mean_episode_lengths_noise_{noise_str}.png"), bbox_inches="tight", dpi=300)
     plt.tight_layout()
     plt.show()
     
