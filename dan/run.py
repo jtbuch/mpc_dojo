@@ -13,7 +13,7 @@ def simulate(bird, world, n_episodes, time_steps, train=False):
         x, y, z = world.random_state_coords()
         state  = world.state_to_index(x, y, z)
         action = bird.policy(state)
-        bird.register_action() 
+        bird.register_action()
 
         # Time-step loop
         for t in range(0, time_steps):
@@ -39,8 +39,9 @@ if __name__ == "__main__":
     plt.close('all')
 
     # Could take args, this is fine though
-    use_RL_bird = True
+    use_RL_bird = False
     use_MPC_bird = False
+    compare = True
 
     # Create environment
     world = World(x_size = 5, y_size = 3, z_size = 5, wind = [0.0, 0.0, 0.0])
@@ -84,3 +85,50 @@ if __name__ == "__main__":
 
         # Plot it's final episode state occupancy
         plot_state_occupancy_heatmap(mpc_bird_hist, world)
+
+        # Plot the average reward per time step
+        reward_per_time = np.cumsum(mpc_bird_hist[:,:,2], axis=1)/np.arange(1, mpc_bird_hist.shape[1]+1)
+
+
+    if compare:
+        tsteps = 600
+        reward_per_time = np.zeros((3, tsteps))
+
+        for i in range(0,3):
+            # Set recompute times
+            recompute = i*2+1
+            
+            # Setup the world
+            world = World(x_size = 5, y_size = 3, z_size = 5, wind = [0.0, 0.0, 0.0])
+
+            # Create bird
+            mpc_bird = MPCShittyBird(n_actions = world.n_actions, recompute = recompute)
+            mpc_bird.init_transition_model(world)
+
+            # Get performance
+            mpc_bird_hist = simulate(mpc_bird, world, n_episodes=20, time_steps=tsteps, train=True)
+
+            # Plot the average reward per time step
+            reward_per_time[i,:] = np.mean(np.cumsum(mpc_bird_hist[:,:,2], axis=1)/np.arange(1, tsteps+1), axis=0)
+
+
+
+        plt.figure()
+        plt.plot(reward_per_time.T, label=['RT1', 'RT3', 'RT5'])
+        plt.title('Average Reward Rate\nNoisy World, Correct Model')
+        plt.xlabel('Time step')
+        plt.ylabel('Reward')
+        plt.grid()
+        plt.legend()
+        plt.tight_layout()
+
+
+        plt.figure()
+        plt.plot(reward_per_time.T, label=['RT1', 'RT3', 'RT5'])
+        plt.title('Average Reward Rate\nNoiseless World, Correct Model')
+        plt.xlabel('Time step')
+        plt.ylabel('Reward Rate')
+        plt.grid()
+        plt.legend()
+        plt.tight_layout()
+
