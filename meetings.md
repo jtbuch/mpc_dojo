@@ -1,3 +1,8 @@
+# Meeting 2025-05-07
+- Went over Ivan's first pass implementation of Mujoco inverted pendulum task in gymnasium (Ivan/MPC_Mujoco_Cartpole/Cartpole_Control.ipynb)
+- Added chat gpt's integration of Ivan's code with Dan's bird code
+- Dan and Ivan will work over the weekend on getting this integrated code to run
+
 # Meeting 2025-04-16
 - Went over the relation between SARSA and Dyna timesteps and n_planning
   - Should basically be interchangeable 
