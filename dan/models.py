@@ -1,6 +1,9 @@
 import numpy as np
 
-class WorldModel:
+import mujoco
+import copy
+
+class BirdWorldModel:
     """ What the bird thinks."""
     def __init__(self, n_states, n_actions):
         self.autonomous = np.randn(n_states, n_states)
@@ -9,7 +12,7 @@ class WorldModel:
     def transition(self, state, action):
         self.state = self.autonomous @ self.state + self.controlled @ self.action
 
-class World:
+class BirdWorld:
     """ The way life actually is. The bird falls down unless it flaps."""
     def __init__(self, x_size, y_size, z_size, wind=[0.0, 0.0, 0.0]):
         # Gridworld dimensions
@@ -109,7 +112,7 @@ class World:
         
 class MPCShittyBird:
     """ Doesn't aspire to much. """
-    def __init__(self, n_actions, recompute = 10):
+    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10):
         # Model parameters
         self.n_actions = n_actions      # Number of actions available
         self.recompute = recompute      # How often to recompute the control trajectory
@@ -117,8 +120,8 @@ class MPCShittyBird:
         self.control_step = 0           # Current step in the control trajectory
 
         # Trajectory search parameters, probably shouldn't be here...
-        self.n_planning     = 10        # Number of planning steps
-        self.planning_width = 5         # Number of trajectories to sample
+        self.n_planning     = n_planning        # Number of planning steps
+        self.planning_width = planning_width         # Number of trajectories to sample
         self.epsilon        = 0.2       # Epsilon greedy action selection                
 
     def init_transition_model(self, world):
@@ -146,6 +149,57 @@ class MPCShittyBird:
         """ Register that an action has been taken. """
         self.control_step += 1
         self.control_step %= self.recompute
+
+    def restore_state(self, env, qpos, qvel):
+        # Restore the environment's state
+        env.unwrapped.data.qpos[:] = qpos
+        env.unwrapped.data.qvel[:] = qvel
+
+        # We need to call mujoco.mj_forward to update the simulation state with the restored positions and velocities.
+        # This function ensures that all the states are correctly computed after restoring the qpos and qvel.
+        mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
+
+
+    def mujoco_policy(self, env):
+
+        # Save the current state of the environment using qpos and qvel
+        saved_qpos = copy.deepcopy(env.unwrapped.data.qpos)
+        saved_qvel = copy.deepcopy(env.unwrapped.data.qvel)
+
+        cumulative_reward = np.zeros(self.planning_width)
+        actions = np.zeros([self.planning_width, self.n_planning])
+
+        obs_ = saved_qpos[0:2]
+
+        for i_trajectory in range(self.planning_width):
+            self.restore_state(env, saved_qpos, saved_qvel)
+
+            for step in range(self.n_planning):
+                # get random action
+                #action = env.action_space.sample()
+                action = np.array([(np.random.rand()-0.5)*3])
+            
+                # Perform the step
+                obs_, reward, done, truncated, info = env.step(action)
+
+                reward = -np.abs(obs_[1])
+
+                cumulative_reward[i_trajectory] += reward
+                actions[i_trajectory, step] = action
+
+        self.restore_state(env, saved_qpos, saved_qvel)
+
+        #print(f"State: {obs_}")
+        #print(f"Cumulative reward: {cumulative_reward}")
+        #print(f"Best trajectory: {actions[i_trajectory, :]}")
+
+        best_trajectory = np.argmax(cumulative_reward)
+        best_action = actions[best_trajectory, 0]
+
+        
+        # Return the best policy from this state forward
+        return best_action
+    
 
     def get_forward_policy(self, state):
         """
