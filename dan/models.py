@@ -112,7 +112,7 @@ class BirdWorld:
         
 class MPCShittyBird:
     """ Doesn't aspire to much. """
-    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10):
+    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete'):
         # Model parameters
         self.n_actions = n_actions      # Number of actions available
         self.recompute = recompute      # How often to recompute the control trajectory
@@ -122,7 +122,9 @@ class MPCShittyBird:
         # Trajectory search parameters, probably shouldn't be here...
         self.n_planning     = n_planning        # Number of planning steps
         self.planning_width = planning_width         # Number of trajectories to sample
-        self.epsilon        = 0.2       # Epsilon greedy action selection                
+        self.epsilon        = 0.2       # Epsilon greedy action selection
+
+        self.reward_type = reward_type # rewards are discrete or continuous
 
     def init_transition_model(self, world):
         """  """
@@ -182,7 +184,14 @@ class MPCShittyBird:
                 # Perform the step
                 obs_, reward, done, truncated, info = env.step(action)
 
-                reward = -np.abs(obs_[1])
+                # Make the rewards be discrete or continuous
+                if self.reward_type == 'discrete':
+                     reward = reward
+                elif self.reward_type == 'continuous':
+                    reward = -np.abs(obs_[1])
+                
+                # Print reward
+                #print(f"Reward: {reward}")
 
                 cumulative_reward[i_trajectory] += reward
                 actions[i_trajectory, step] = action
@@ -192,6 +201,7 @@ class MPCShittyBird:
         #print(f"State: {obs_}")
         #print(f"Cumulative reward: {cumulative_reward}")
         #print(f"Best trajectory: {actions[i_trajectory, :]}")
+
 
         best_trajectory = np.argmax(cumulative_reward)
         best_action = actions[best_trajectory, 0]
