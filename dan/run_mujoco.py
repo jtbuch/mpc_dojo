@@ -31,7 +31,7 @@ def simulate(bird, n_episodes, time_steps):
         rewards  = np.zeros((time_steps))
 
         for t in range(time_steps):
-            print(f"States: {env.unwrapped.data.qpos}, {env.unwrapped.data.qvel}")
+            #print(f"States: {env.unwrapped.data.qpos}, {env.unwrapped.data.qvel}")
             action = bird.mujoco_policy(env)
             actions[t] = action
 
@@ -55,7 +55,7 @@ def simulate(bird, n_episodes, time_steps):
     return angles, actions
 
 
-bird = MPCShittyBird(n_actions = 10, planning_width=100, n_planning=10)
+bird = MPCShittyBird(n_actions = 10, planning_width=100, n_planning=10, reward_type='continuous')
 
 angle, actions = simulate(bird, n_episodes=1, time_steps=100)
 
