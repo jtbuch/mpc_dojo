@@ -162,7 +162,7 @@ class MPCShittyBird:
         mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
 
 
-    def mujoco_policy(self, env):
+    def mujoco_policy(self, env, seed):
 
         # Save the current state of the environment using qpos and qvel
         saved_qpos = copy.deepcopy(env.unwrapped.data.qpos)
@@ -179,6 +179,8 @@ class MPCShittyBird:
             for step in range(self.n_planning):
                 # get random action
                 #action = env.action_space.sample()
+                current_seed = seed + i_trajectory * 1000 + step
+                np.random.seed(current_seed)
                 action = np.array([(np.random.rand()-0.5)*3])
             
                 # Perform the step
