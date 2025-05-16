@@ -1,7 +1,7 @@
 import numpy as np
-
 import mujoco
 import copy
+from scipy.linalg import expm, svd
 
 class BirdWorldModel:
     """ What the bird thinks."""
@@ -112,7 +112,7 @@ class BirdWorld:
         
 class MPCShittyBird:
     """ Doesn't aspire to much. """
-    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete'):
+    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco'):
         # Model parameters
         self.n_actions = n_actions      # Number of actions available
         self.recompute = recompute      # How often to recompute the control trajectory
@@ -125,6 +125,7 @@ class MPCShittyBird:
         self.epsilon        = 0.2       # Epsilon greedy action selection
 
         self.reward_type = reward_type # rewards are discrete or continuous
+        self.model_type  = model_type   # 'mujoco' or 'linear_full' or 'linear_reduced_<int>'
 
     def init_transition_model(self, world):
         """  """
@@ -161,6 +162,115 @@ class MPCShittyBird:
         # This function ensures that all the states are correctly computed after restoring the qpos and qvel.
         mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
 
+    def predict_next_state_inverted_pendulum(self, env, obs, action):
+        """
+        Predict next state for InvertedPendulum-v5 using linearized model,
+        with rank determined by self.model_type:
+        - 'linear_full' uses full rank A
+        - 'linear_reduced_<int>' uses that integer as rank for reduced A
+
+        Parameters:
+        - env: the gymnasium environment object.
+        - obs: current state (numpy array or scalar, shape=(4,))
+        - action: control input (numpy array or scalar, shape=(1,))
+
+        Returns:
+        - next_obs: predicted next state (numpy array)
+        """
+
+        # # Continuous-time linearized system matrices
+        # A_c = np.array([
+        #     [0, 0, 1, 0],
+        #     [0, 0, 0, 1],
+        #     [0, -2.90535, -0.08367, 0.19671],
+        #     [0, 29.89257, 0.19671, -2.02391]
+        # ])
+
+        # B_c = np.array([
+        #     [0],
+        #     [0],
+        #     [8.36743],
+        #     [-19.67105]
+        # ])
+
+        # From mujoco using mujoco.mjd_transitionFD(model, data, epsilon, centered, A, B, None, None)
+        A_d = np.array([
+            [1.00000000, -0.00111508,  0.01996688,  0.00007550],
+            [0.00000000,  1.01148765,  0.00007550,  0.01922222],
+            [0.00000000, -0.05575393,  0.99834413,  0.00377490],
+            [0.00000000,  0.57438229,  0.00377490,  0.96111076]
+        ])
+
+        B_d = np.array([
+            [ 0.00331173],
+            [-0.00754979],
+            [ 0.16558646],
+            [-0.37748958]
+        ])
+
+        # Discretize A and B
+        dt = env.unwrapped.model.opt.timestep
+        n = A_d.shape[0]
+        m = B_d.shape[1]
+
+        # Determine rank from self.model_type
+        rank = None
+        if hasattr(self, 'model_type'):
+            if self.model_type == 'linear_full':
+                rank = None
+            elif self.model_type.startswith('linear_reduced_'):
+                try:
+                    rank = int(self.model_type.split('_')[-1])
+                    if rank > n:
+                        rank = n  # cap rank at full size
+                except ValueError:
+                    rank = None  # fallback to full rank if parsing fails
+
+        # Apply rank reduction if requested
+        if rank is not None and rank < A_d.shape[0]:
+            U, S, Vh = svd(A_d)
+            S_reduced = np.zeros_like(S)
+            S_reduced[:rank] = S[:rank]
+            A_d = U @ np.diag(S_reduced) @ Vh
+
+        obs = np.array(obs)
+        action = np.atleast_1d(action)
+
+        next_obs = A_d @ obs + B_d @ action
+
+        return next_obs
+    
+    def take_step(self, env, obs, action):
+        """
+        Compute reward based on either MuJoCo env step (model_type='mujoco') or linearized model prediction (reduced ('linear') or not ('reduced')).
+
+        Parameters:
+        - env: the gymnasium environment object.
+        - obs: current state (numpy array or scalar).
+        - action: control input/action (numpy array or scalar).
+
+        Returns:
+        - reward: reward computed based on selected method.
+        """
+        if self.model_type == 'mujoco':
+            # Use MuJoCo step to get next obs and reward
+            next_obs, reward, done, truncated, info = env.step(action)
+            if self.reward_type == 'discrete':
+                return reward, next_obs
+            elif self.reward_type == 'continuous':
+                reward = -np.abs(next_obs[1])  # negative absolute angle
+                return reward, next_obs
+
+        else:
+            # Use linearized discrete model to predict next state and compute reward
+            next_obs = self.predict_next_state_inverted_pendulum(env, obs, action)
+
+            if self.reward_type == 'discrete':
+                reward = 1.0 if (-0.2 <= next_obs[1] <= 0.2) else 0.0
+            elif self.reward_type == 'continuous':
+                reward = -np.abs(next_obs[1])
+            
+        return reward, next_obs
 
     def mujoco_policy(self, env):
 
@@ -171,27 +281,30 @@ class MPCShittyBird:
         cumulative_reward = np.zeros(self.planning_width)
         actions = np.zeros([self.planning_width, self.n_planning])
 
-        obs_ = saved_qpos[0:2]
+        obs_ = np.concatenate([saved_qpos, saved_qvel])
 
         for i_trajectory in range(self.planning_width):
             self.restore_state(env, saved_qpos, saved_qvel)
+            obs = obs_
 
             for step in range(self.n_planning):
                 # get random action
                 #action = env.action_space.sample()
                 action = np.array([(np.random.rand()-0.5)*3])
             
-                # Perform the step
-                obs_, reward, done, truncated, info = env.step(action)
+                # # Perform the step
+                # obs_, reward, done, truncated, info = env.step(action)
 
-                # Make the rewards be discrete or continuous
-                if self.reward_type == 'discrete':
-                     reward = reward
-                elif self.reward_type == 'continuous':
-                    reward = -np.abs(obs_[1])
-                
+                # # Make the rewards be discrete or continuous
+                # if self.reward_type == 'discrete':
+                #      reward = reward
+                # elif self.reward_type == 'continuous':
+                #     reward = -np.abs(obs_[1])
+
+                # Perform the step and get the reward
+                reward, obs = self.take_step(env, obs, action)
                 # Print reward
-                #print(f"Reward: {reward}")
+                # print(f"Reward: {reward}")
 
                 cumulative_reward[i_trajectory] += reward
                 actions[i_trajectory, step] = action
