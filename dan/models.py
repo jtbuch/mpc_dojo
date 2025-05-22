@@ -272,25 +272,30 @@ class MPCShittyBird:
             
         return reward, next_obs
 
-    def mujoco_policy(self, env):
+    def mujoco_policy(self, env, obs):
 
         # Save the current state of the environment using qpos and qvel
         saved_qpos = copy.deepcopy(env.unwrapped.data.qpos)
         saved_qvel = copy.deepcopy(env.unwrapped.data.qvel)
 
         cumulative_reward = np.zeros(self.planning_width)
-        actions = np.zeros([self.planning_width, self.n_planning])
-
-        obs_ = np.concatenate([saved_qpos, saved_qvel])
+        actions = np.zeros([self.planning_width, self.n_planning, *env.action_space.shape])
 
         for i_trajectory in range(self.planning_width):
             self.restore_state(env, saved_qpos, saved_qvel)
-            obs = obs_
 
             for step in range(self.n_planning):
                 # get random action
-                #action = env.action_space.sample()
-                action = np.array([(np.random.rand()-0.5)*3])
+                # action = env.action_space.sample()
+                # action = np.array([(np.random.rand()-0.5)*3])
+                # action = (np.random.rand(*env.action_space.shape) - 0.5) * 3
+
+                # Extract lower and upper bounds from the action space
+                low = env.action_space.low
+                high = env.action_space.high
+
+                # Generate a random action uniformly within [low, high]
+                action = np.random.uniform(low=low, high=high, size=env.action_space.shape)
             
                 # # Perform the step
                 # obs_, reward, done, truncated, info = env.step(action)
