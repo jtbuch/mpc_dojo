@@ -286,9 +286,16 @@ class MPCShittyBird:
 
             for step in range(self.n_planning):
                 # get random action
-                action = env.action_space.sample()
+                # action = env.action_space.sample()
                 # action = np.array([(np.random.rand()-0.5)*3])
                 # action = (np.random.rand(*env.action_space.shape) - 0.5) * 3
+
+                # Extract lower and upper bounds from the action space
+                low = env.action_space.low
+                high = env.action_space.high
+
+                # Generate a random action uniformly within [low, high]
+                action = np.random.uniform(low=low, high=high, size=env.action_space.shape)
             
                 # # Perform the step
                 # obs_, reward, done, truncated, info = env.step(action)
