@@ -112,7 +112,7 @@ class BirdWorld:
         
 class MPCShittyBird:
     """ Doesn't aspire to much. """
-    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco'):
+    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco', action_cost=0.0):
         # Model parameters
         self.n_actions = n_actions      # Number of actions available
         self.recompute = recompute      # How often to recompute the control trajectory
@@ -126,6 +126,7 @@ class MPCShittyBird:
 
         self.reward_type = reward_type # rewards are discrete or continuous
         self.model_type  = model_type   # 'mujoco' or 'linear_full' or 'linear_reduced_<int>'
+        self.action_cost = action_cost
 
     def init_transition_model(self, world):
         """  """
@@ -294,6 +295,9 @@ class MPCShittyBird:
                 action = np.random.uniform(low=env.action_space.low, high=env.action_space.high)
                 # action = (np.random.rand(*env.action_space.shape) - 0.5) * 2
                 reward, next_obs = self.take_step(env, current_obs, action)
+
+                # Subtract the squared action cost
+                reward -= self.action_cost * np.sum(np.square(action))
 
                 cumulative_reward[i_trajectory] += reward
                 cummulative_action[i_trajectory] += np.abs(action)
