@@ -109,10 +109,10 @@ class BirdWorld:
         if y_wall:  reward += -5
 
         return reward
-        
+
 class MPCShittyBird:
     """ Doesn't aspire to much. """
-    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco', action_cost=0.0):
+    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco', action_cost=0.0, sampling_method='random'):
         # Model parameters
         self.n_actions = n_actions      # Number of actions available
         self.recompute = recompute      # How often to recompute the control trajectory
@@ -127,6 +127,7 @@ class MPCShittyBird:
         self.reward_type = reward_type # rewards are discrete or continuous
         self.model_type  = model_type   # 'mujoco' or 'linear_full' or 'linear_reduced_<int>'
         self.action_cost = action_cost
+        self.sampling_method = sampling_method  # 'random' or 'predictive'
 
     def init_transition_model(self, world):
         """  """
@@ -274,16 +275,57 @@ class MPCShittyBird:
         return reward, next_obs
 
     def mujoco_policy(self, env, obs):
+        """
+        Model Predictive Control policy that can use either:
+        - 'random': Random Shooting (uniform random sampling)
+        - 'predictive': Predictive Sampling (persistent nominal trajectory with noise)
+        """
+        # Initialize persistent nominal trajectory if using Predictive Sampling
+        if not hasattr(self, 'nominal_trajectory') and hasattr(self, 'sampling_method') and self.sampling_method == 'predictive':
+            self.nominal_trajectory = np.zeros([self.n_planning, *env.action_space.shape])
+        
+        # Save environment state
         if self.model_type == 'mujoco':
             saved_qpos = copy.deepcopy(env.unwrapped.data.qpos)
             saved_qvel = copy.deepcopy(env.unwrapped.data.qvel)
         else:
             initial_obs = obs.copy()
 
+        # Initialize data structures
         cumulative_reward = np.zeros(self.planning_width)
-        cummulative_action = np.zeros(self.planning_width)
+        cummulative_action = np.zeros(self.planning_width)  # Kept for compatibility
         actions = np.zeros([self.planning_width, self.n_planning, *env.action_space.shape])
 
+        # Generate candidate trajectories based on sampling method
+        if hasattr(self, 'sampling_method') and self.sampling_method == 'predictive':
+            # --- Predictive Sampling ---
+            # Shift previous best trajectory forward
+            if self.n_planning > 1:
+                self.nominal_trajectory = np.vstack([
+                    self.nominal_trajectory[1:],
+                    np.zeros((1, *env.action_space.shape))
+                ])
+            
+            # First candidate is the nominal trajectory
+            actions[0] = self.nominal_trajectory
+            
+            # Generate noisy variations for other candidates
+            noise_std = 0.1 * (env.action_space.high - env.action_space.low)
+            for i in range(1, self.planning_width):
+                noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
+                actions[i] = self.nominal_trajectory + noise
+                actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
+        else:
+            # --- Random Shooting ---
+            # Generate completely random trajectories for all candidates
+            for i_trajectory in range(self.planning_width):
+                for step in range(self.n_planning):
+                    actions[i_trajectory, step] = np.random.uniform(
+                        low=env.action_space.low, 
+                        high=env.action_space.high
+                    )
+
+        # Evaluate all trajectories
         for i_trajectory in range(self.planning_width):
             if self.model_type == 'mujoco':
                 self.restore_state(env, saved_qpos, saved_qvel)
@@ -292,29 +334,33 @@ class MPCShittyBird:
                 current_obs = initial_obs.copy()
 
             for step in range(self.n_planning):
-                action = np.random.uniform(low=env.action_space.low, high=env.action_space.high)
-                # action = (np.random.rand(*env.action_space.shape) - 0.5) * 2
+                action = actions[i_trajectory, step]
                 reward, next_obs = self.take_step(env, current_obs, action)
 
                 # Subtract the squared action cost
                 reward -= self.action_cost * np.sum(np.square(action))
 
                 cumulative_reward[i_trajectory] += reward
-                cummulative_action[i_trajectory] += np.abs(action)
-                actions[i_trajectory, step] = action
+                cummulative_action[i_trajectory] += np.abs(action)  # Kept for compatibility
                 current_obs = next_obs
 
-        self.restore_state(env, saved_qpos, saved_qvel)
+        # Restore environment state
+        if self.model_type == 'mujoco':
+            self.restore_state(env, saved_qpos, saved_qvel)
 
+        # Select best trajectory
         best_trajectory = np.argmax(cumulative_reward)
-        # score = cumulative_reward - 0.9 * cummulative_action
-        # best_trajectory = np.argmax(score)
-        best_action_trajectory = actions[best_trajectory, :]
-
+        best_action_trajectory = actions[best_trajectory]
+        
+        # Update nominal trajectory if using Predictive Sampling
+        if hasattr(self, 'sampling_method') and self.sampling_method == 'predictive':
+            self.nominal_trajectory = best_action_trajectory
         
         # Return the best policy from this state forward
         return best_action_trajectory
     
+
+
 
     def get_forward_policy(self, state):
         """
