@@ -280,6 +280,7 @@ class MPCShittyBird:
             initial_obs = obs.copy()
 
         cumulative_reward = np.zeros(self.planning_width)
+        cummulative_action = np.zeros(self.planning_width)
         actions = np.zeros([self.planning_width, self.n_planning, *env.action_space.shape])
 
         for i_trajectory in range(self.planning_width):
@@ -290,17 +291,20 @@ class MPCShittyBird:
                 current_obs = initial_obs.copy()
 
             for step in range(self.n_planning):
-                # action = np.random.uniform(low=env.action_space.low, high=env.action_space.high)
-                action = (np.random.rand(*env.action_space.shape) - 0.5) * 3
+                action = np.random.uniform(low=env.action_space.low, high=env.action_space.high)
+                # action = (np.random.rand(*env.action_space.shape) - 0.5) * 2
                 reward, next_obs = self.take_step(env, current_obs, action)
 
                 cumulative_reward[i_trajectory] += reward
+                cummulative_action[i_trajectory] += np.abs(action)
                 actions[i_trajectory, step] = action
                 current_obs = next_obs
 
         self.restore_state(env, saved_qpos, saved_qvel)
 
         best_trajectory = np.argmax(cumulative_reward)
+        # score = cumulative_reward - 0.9 * cummulative_action
+        # best_trajectory = np.argmax(score)
         best_action_trajectory = actions[best_trajectory, :]
 
         
