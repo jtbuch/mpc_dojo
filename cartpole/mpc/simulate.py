@@ -327,7 +327,7 @@ def run_simulations(config):
         for n_planning in planning_values_to_run:
             if n_planning >= interval:  # Skip invalid configuration
                 # Define model file path
-                model_file = os.path.join(models_dir, f'model_interval{interval}_planning{n_planning}.pkl')
+                model_file = os.path.join(models_dir, f'model_interval{interval}_planning{n_planning}_time{timestamp}.pkl')
                 
                 # Run the simulation for this configuration
                 result = run_simulation(interval, n_planning, config)
