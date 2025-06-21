@@ -20,7 +20,7 @@ config = {
     'reward_type': 'continuous',
     'model_type': 'mujoco',
     'obs_noise_mu': np.array([0.0, 0.0, 0.0, 0.0]),
-    'obs_noise_sigma': np.array([0.0, 0.0, 0.0, 0.0]),
+    'obs_noise_sigma': np.array([0.2, 0.2, 0.02, 0.02]),
     'act_noise_mu': np.array([0.0]),
     'act_noise_sigma': np.array([0.0]),
     'n_episodes': 100,
