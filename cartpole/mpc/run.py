@@ -23,8 +23,8 @@ config = {
     'obs_noise_sigma': np.array([0.0, 0.0, 0.0, 0.0]),
     'act_noise_mu': np.array([0.0]),
     'act_noise_sigma': np.array([0.0]),
-    'n_episodes': 5,
-    'time_steps': 50,
+    'n_episodes': 100,
+    'time_steps': 1000,
     'action_cost': 0.2,
     'sampling_method': 'predictive',
     'recompute_intervals': [recompute_interval],  # Use the command line argument
