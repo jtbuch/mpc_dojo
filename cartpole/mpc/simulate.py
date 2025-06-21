@@ -92,7 +92,7 @@ def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noi
             for name in reward_components:
                 reward_components[name][t] = info.get(name, 0.0)
 
-            if epi == n_episodes - 1:
+            # if epi == n_episodes - 1:
                 # frame = env.render()
                 # writer.append_data(np.asarray(frame).astype(np.uint8))
 
