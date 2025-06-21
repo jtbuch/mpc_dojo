@@ -1,0 +1,38 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join('..')))
+from mpc.configs import *
+import numpy as np
+import matplotlib.pyplot as plt
+import gymnasium as gym
+import imageio
+
+
+# Parse command line arguments
+recompute_interval = int(sys.argv[1])
+n_planning = int(sys.argv[2])
+
+print(f"Running simulation with recompute_interval={recompute_interval}, n_planning={n_planning}")
+
+# Define configuration
+config = {
+    'planning_width': 200,
+    'reward_type': 'continuous',
+    'model_type': 'mujoco',
+    'obs_noise_mu': np.array([0.0, 0.0, 0.0, 0.0]),
+    'obs_noise_sigma': np.array([0.0, 0.0, 0.0, 0.0]),
+    'act_noise_mu': np.array([0.0]),
+    'act_noise_sigma': np.array([0.0]),
+    'n_episodes': 5,
+    'time_steps': 50,
+    'action_cost': 0.2,
+    'sampling_method': 'predictive',
+    'recompute_intervals': [recompute_interval],  # Use the command line argument
+    'n_planning_values': [n_planning]             # Use the command line argument
+}
+
+# Run the simulation
+run_simulations(config)
+
+# No need to analyze results here as we'll do that separately
+print(f"Simulation completed with recompute_interval={recompute_interval}, n_planning={n_planning}")
