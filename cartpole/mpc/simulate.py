@@ -25,7 +25,7 @@ def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noi
         env.action_space.seed(episode_seed)
         env.observation_space.seed(episode_seed)
 
-        writer = imageio.get_writer("output.gif", fps=30)
+        # writer = imageio.get_writer("output.gif", fps=30)
 
         obs_dim = env.observation_space.shape[0]
         act_dim = env.action_space.shape[0]
@@ -94,9 +94,9 @@ def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noi
 
             if epi == n_episodes - 1:
                 frame = env.render()
-                writer.append_data(np.asarray(frame).astype(np.uint8))
+                # writer.append_data(np.asarray(frame).astype(np.uint8))
 
-        writer.close()
+        # writer.close()
         env.close()
 
         episode_data = {}
