@@ -256,6 +256,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].set_title('Average Reward')
     axs[0].set_xlabel('n_planning')
     axs[0].set_ylabel('Avg Reward (± SEM)')
+    axs[0].set_ylim(-2,0.1)
     axs[0].grid(True)
     axs[0].legend()
     
@@ -340,12 +341,16 @@ def run_simulations(config):
     print(f"Simulations completed in {time.time() - start_time:.2f} seconds")
     return timestamp
 
-def analyze_and_plot_results(custom_config=None, timestamp=None):
+
+
+def analyze_and_plot_results(config=None, timestamp=None):
     """
     Load ALL simulation results from the models directory, compute statistics, and generate plots.
     
     Args:
-        custom_config: Optional custom configuration for plotting (defaults to using config from models)
+        config: Optional dictionary that can include:
+            - filtering criteria (e.g., 'obs_noise_mu' to filter results)
+            - plotting configuration (e.g., 'planning_width', 'reward_type')
         timestamp: Optional timestamp for naming output files (if None, generate a new one)
         
     Returns:
@@ -368,33 +373,51 @@ def analyze_and_plot_results(custom_config=None, timestamp=None):
     if not results_list:
         print("No model results found in the models directory.")
         return None, None, None
+
+    # Initialize filter criteria and custom plotting config
+    filter_criteria = {}
+    custom_plotting_config = {}
     
-    # Extract configuration from the first model result if no custom config provided
-    if custom_config is None:
-        # Use the first model's config as a base
-        config = results_list[0]['config'].copy()
-        
-        # Update recompute_intervals and n_planning_values based on all loaded models
-        unique_intervals = set()
-        unique_planning = set()
-        
+    if config is not None:
+        for key, value in config.items():
+            # Determine if the key is for filtering or for configuration
+            if key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma']:  # Extend as needed
+                filter_criteria[key] = value
+            else:
+                custom_plotting_config[key] = value
+
+    # Filter results based on filter_criteria
+    if filter_criteria:
+        filtered_results = []
         for result in results_list:
-            unique_intervals.add(result['interval'])
-            unique_planning.add(result['n_planning'])
-        
-        config['recompute_intervals'] = sorted(list(unique_intervals))
-        config['n_planning_values'] = sorted(list(unique_planning))
+            match = True
+            for key, value in filter_criteria.items():
+                if not np.array_equal(result['config'][key], value):
+                    match = False
+                    break
+            if match:
+                filtered_results.append(result)
     else:
-        config = custom_config
+        filtered_results = results_list
+
+    if not filtered_results:
+        print("No model results found with the specified configuration.")
+        return None, None, None
+
+    # Extract configuration from the first filtered model result
+    config = filtered_results[0]['config'].copy()
     
+    # Update plotting configuration parameters if not overridden
+    config.update(custom_plotting_config)
+
     # Save combined results
     combined_results_file = os.path.join(results_dir, f"combined_results_{timestamp}.pkl")
     with open(combined_results_file, 'wb') as f:
-        pickle.dump(results_list, f)
+        pickle.dump(filtered_results, f)
     print(f"Combined results saved to {combined_results_file}")
     
     # Compute statistics
-    results_with_stats, termination_with_stats = compute_stats(results_list)
+    results_with_stats, termination_with_stats = compute_stats(filtered_results)
     
     # Plot results
     fig = plot_results(results_with_stats, termination_with_stats, config)

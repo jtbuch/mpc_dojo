@@ -11,6 +11,10 @@ import imageio
 # Parse command line arguments
 recompute_interval = int(sys.argv[1])
 n_planning = int(sys.argv[2])
+obs_noise = float(sys.argv[3])
+obs_mu = float(sys.argv[4])
+act_noise = float(sys.argv[5])
+act_mu = float(sys.argv[6])
 
 print(f"Running simulation with recompute_interval={recompute_interval}, n_planning={n_planning}")
 
@@ -19,10 +23,10 @@ config = {
     'planning_width': 200,
     'reward_type': 'continuous',
     'model_type': 'mujoco',
-    'obs_noise_mu': np.array([0.0, 0.0, 0.0, 0.0]),
-    'obs_noise_sigma': np.array([0.4, 0.4, 0.04, 0.04]),
-    'act_noise_mu': np.array([0.0]),
-    'act_noise_sigma': np.array([0.0]),
+    'obs_noise_mu': np.array([obs_mu, obs_mu, obs_mu*0.1, obs_mu*0.1]),
+    'obs_noise_sigma': np.array([obs_noise, obs_noise, obs_noise*0.1, obs_noise*0.1]),
+    'act_noise_mu': np.array([act_mu]),
+    'act_noise_sigma': np.array([act_noise]),
     'n_episodes': 100,
     'time_steps': 1000,
     'action_cost': 0.2,
