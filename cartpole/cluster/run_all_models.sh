@@ -29,7 +29,7 @@ for interval in "${intervals[@]}"; do
                         sbatch \
                             --job-name="MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}" \
                             --account=carney-ashenhav-condo \
-                            --time=70:00:00 \
+                            --time=10:00:00 \
                             --mem=10G \
                             --nodes=1 \
                             -o "log/MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}.%j.out" \
