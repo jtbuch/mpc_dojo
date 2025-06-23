@@ -13,10 +13,10 @@
 # Array of intervals and horizons
 declare -a intervals=(1 3 5)
 declare -a horizons=(1 10 20 30 40 50 60 70 80 90 100)
-declare -a obs_noises = (0.0 0.2 0.4)
-declare -a action_noises = (0.0 0.2 0.4)
-declare -a obs_mus = (0.0 0.2 0.4)
-declare -a action_mus = (0.0 0.2 0.4)
+declare -a obs_noises=(0.0 0.2 0.4)
+declare -a action_noises=(0.0 0.2 0.4)
+declare -a obs_mus=(0.0 0.2 0.4)
+declare -a action_mus=(0.0 0.2 0.4)
 
 # Loop over all parameters
 for interval in "${intervals[@]}"; do
