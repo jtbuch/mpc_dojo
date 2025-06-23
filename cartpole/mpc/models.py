@@ -521,3 +521,4 @@ class RLShittyBird:
     def register_action(self):
         """ Register that an action has been taken (compatibility method) """
         pass
+
