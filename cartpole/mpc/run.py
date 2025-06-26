@@ -20,7 +20,7 @@ print(f"Running simulation with recompute_interval={recompute_interval}, n_plann
 
 # Define configuration
 config = {
-    'planning_width': 5,
+    'planning_width': 10,
     'reward_type': 'continuous',
     'model_type': 'mujoco',
     'obs_noise_mu': np.array([obs_mu, obs_mu, obs_mu*0.1, obs_mu*0.1]),
@@ -28,7 +28,7 @@ config = {
     'act_noise_mu': np.array([act_mu]),
     'act_noise_sigma': np.array([act_noise]),
     'n_episodes': 2,
-    'time_steps': 3,
+    'time_steps': 10,
     'action_cost': 0.2,
     'sampling_method': 'predictive',
     'recompute_intervals': [recompute_interval],  # Use the command line argument
