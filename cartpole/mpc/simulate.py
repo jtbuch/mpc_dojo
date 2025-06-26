@@ -329,7 +329,7 @@ def run_simulations(config):
         for n_planning in planning_values_to_run:
             if n_planning >= interval:  # Skip invalid configuration
                 # Define model file path
-                model_file = os.path.join(models_dir, f'model_interval{interval}_planning{n_planning}_obs{config["obs_noise_mu"][0]}_act{config["act_noise_mu"][0]}_time{timestamp}.pkl')
+                model_file = os.path.join(models_dir, f'model_interval{interval}_planning{n_planning}_obsnoise{config["obs_noise_sigma"][0]}_obsmu{config["obs_noise_mu"][0]}_actnoise{config["act_noise_sigma"][0]}_actmu{config["act_noise_mu"][0]}_time{timestamp}.pkl')
                 
                 # Run the simulation for this configuration
                 result = run_simulation(interval, n_planning, config)
