@@ -9,6 +9,7 @@ import time
 import os
 
 
+
 def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noise_mu=np.array([1.0, 0.0, 0.0, 0.0]), obs_noise_sigma=np.array([0.0, 0.0, 0.0, 0.0]), act_noise_mu=np.array([0.0]), act_noise_sigma=np.array([0.0]), reward_type='continuous', action_cost = 0.0):
     """Simulate bird."""
 
