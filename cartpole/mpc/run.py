@@ -28,7 +28,7 @@ config = {
     'act_noise_mu': np.array([act_mu]),
     'act_noise_sigma': np.array([act_noise]),
     'n_episodes': 10,
-    'time_steps': 200,
+    'time_steps': 400,
     'action_cost': 0.2,
     'sampling_method': 'predictive',
     'recompute_intervals': [recompute_interval],  # Use the command line argument

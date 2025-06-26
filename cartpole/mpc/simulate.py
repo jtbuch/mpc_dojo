@@ -282,7 +282,8 @@ def plot_results(results_with_stats, termination_with_stats, config):
         f'Reward and Termination Step across Planning & Recompute Intervals\n'
         f'Obs Noise_mu={config["obs_noise_mu"]}, Obs Noise_sigma={config["obs_noise_sigma"]}\n'
         f'Act Noise_mu={config["act_noise_mu"]}, Act Noise_sigma={config["act_noise_sigma"]}\n'
-        f'Act cost={config["action_cost"]}, Sampling method={config["sampling_method"]}',
+        f'Act cost={config["action_cost"]}, Sampling method={config["sampling_method"]}\n'
+        f'Plan Width={config["planning_width"]}, Episodes={config["n_episodes"]}, Timesteps={config["time_steps"]}',
         fontsize=12
     )
     plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -412,10 +413,10 @@ def analyze_and_plot_results(config=None, timestamp=None):
     config.update(custom_plotting_config)
 
     # Save combined results
-    combined_results_file = os.path.join(results_dir, f"combined_results_{timestamp}.pkl")
-    with open(combined_results_file, 'wb') as f:
-        pickle.dump(filtered_results, f)
-    print(f"Combined results saved to {combined_results_file}")
+    # combined_results_file = os.path.join(results_dir, f"combined_results_{timestamp}.pkl")
+    # with open(combined_results_file, 'wb') as f:
+    #     pickle.dump(filtered_results, f)
+    # print(f"Combined results saved to {combined_results_file}")
     
     # Compute statistics
     results_with_stats, termination_with_stats = compute_stats(filtered_results)
