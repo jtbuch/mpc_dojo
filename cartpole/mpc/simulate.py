@@ -429,3 +429,4 @@ def analyze_and_plot_results(config=None, timestamp=None):
     print(f"Plot saved to {plot_filename}")
     
     return fig, results_with_stats, termination_with_stats
+
