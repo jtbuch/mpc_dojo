@@ -317,14 +317,14 @@ class MPCShittyBird:
                 actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
         else:
             # --- Random Shooting ---
-            # Generate completely random trajectories for all candidates
-            for i_trajectory in range(self.planning_width):
-                for step in range(self.n_planning):
-                    actions[i_trajectory, step] = np.random.uniform(
-                        low=env.action_space.low, 
-                        high=env.action_space.high
-                    )
-
+            # Generate all random trajectories at once using vectorization
+            low = env.action_space.low
+            high = env.action_space.high
+            actions = np.random.uniform(
+                low=low,
+                high=high,
+                size=(self.planning_width, self.n_planning) + np.shape(low)
+)
         # Evaluate all trajectories
         for i_trajectory in range(self.planning_width):
             if self.model_type == 'mujoco':
