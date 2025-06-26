@@ -1,4 +1,4 @@
-#!/bin/bash
+ #!/bin/bash
 
 # Activate the desired conda environment
 module load anaconda
