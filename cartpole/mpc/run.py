@@ -15,6 +15,9 @@ obs_noise = float(sys.argv[3])
 obs_mu = float(sys.argv[4])
 act_noise = float(sys.argv[5])
 act_mu = float(sys.argv[6])
+control_model = sys.argv[7]  # 'rl' or 'predictive'
+value = sys.argv[8]  # 'env' or 'rl'
+rl_model = sys.argv[9]  # Name of the RL model to use
 
 print(f"Running simulation with recompute_interval={recompute_interval}, n_planning={n_planning}, obs_noise={obs_noise}, obs_mu={obs_mu}, act_noise={act_noise}, act_mu={act_mu}")
 
@@ -30,9 +33,11 @@ config = {
     'n_episodes': 20,
     'time_steps': 1000,
     'action_cost': 0.2,
-    'sampling_method': 'predictive',
+    'control_model': [control_model],
     'recompute_intervals': [recompute_interval],  # Use the command line argument
-    'n_planning_values': [n_planning]             # Use the command line argument
+    'n_planning_values': [n_planning],             # Use the command line argument
+    'value': [value],
+    'rl_model': [rl_model]  # Use the command line argument
 }
 
 # Run the simulation

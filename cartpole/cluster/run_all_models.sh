@@ -17,6 +17,9 @@ declare -a obs_noises=(0.0 0.4 0.8)
 declare -a action_noises=(0.0 0.1 0.2)
 declare -a obs_mus=(0.0 0.4)
 declare -a action_mus=(0.0 0.2)
+declare -a control_models=("predictive" "rl")
+declare -a values=("env" "rl")
+declare -a rl_models=("50k" "300k")
 
 # Loop over all parameters
 for interval in "${intervals[@]}"; do
@@ -25,15 +28,21 @@ for interval in "${intervals[@]}"; do
             for action_noise in "${action_noises[@]}"; do
                 for obs_mu in "${obs_mus[@]}"; do
                     for action_mu in "${action_mus[@]}"; do
-                        # Submit job with specific parameters
-                        sbatch \
-                            --job-name="MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}" \
-                            --account=carney-ashenhav-condo \
-                            --time=50:00:00 \
-                            --mem=10G \
-                            --nodes=1 \
-                            -o "log/MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}.%j.out" \
-                            run_one_model.sh "$interval" "$horizon" "$obs_noise" "$obs_mu" "$action_noise" "$action_mu"
+                        for control_model in "${control_models[@]}"; do
+                            for value in "${values[@]}"; do
+                                for rl_model in "${rl_models[@]}"; do
+                                    # Submit job with specific parameters
+                                    sbatch \
+                                        --job-name="MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}_ctrl${control_model}_val${value}_rl${rl_model}" \
+                                        --account=carney-ashenhav-condo \
+                                        --time=50:00:00 \
+                                        --mem=10G \
+                                        --nodes=1 \
+                                        -o "log/MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}_ctrl${control_model}_val${value}_rl${rl_model}.%j.out" \
+                                        run_one_model.sh "$interval" "$horizon" "$obs_noise" "$obs_mu" "$action_noise" "$action_mu" "$control_model" "$value" "$rl_model"
+                                done
+                            done
+                        done
                     done
                 done
             done
