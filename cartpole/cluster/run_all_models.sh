@@ -22,13 +22,13 @@
 # declare -a rl_models=("50k" "300k")
 
 declare -a intervals=(1)
-declare -a horizons=(1 2)
+declare -a horizons=(1 2 3 4 5 6 7 8 9 10)
 declare -a obs_noises=(0.0)
 declare -a action_noises=(0.0)
 declare -a obs_mus=(0.0)
 declare -a action_mus=(0.0)
-declare -a control_models=("predictive" "rl") # "predictive" "rl"
-declare -a values=("env" "rl")
+declare -a control_models=("rl") # "predictive" "rl"
+declare -a values=("rl")
 declare -a rl_models=("50k" "300k") # "50k" "
 
 # Loop over all parameters
