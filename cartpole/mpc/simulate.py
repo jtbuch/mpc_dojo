@@ -134,7 +134,10 @@ def run_simulation(interval, n_planning, config):
         reward_type=config['reward_type'],
         model_type=config['model_type'],
         action_cost=config['action_cost'],
-        sampling_method=config['sampling_method']
+        control_model=config['control_model'],
+        value=config['value'],
+        rl_model=config['rl_model']
+
     )
     
     # Run simulation
@@ -278,14 +281,17 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[1].legend()
     axs[1].axhline(y=config['time_steps'], color='r', linestyle='--', label='Max Time Steps')
     
-    plt.suptitle(
+    title = (
         f'Reward and Termination Step across Planning & Recompute Intervals\n'
         f'Obs Noise_mu={config["obs_noise_mu"]}, Obs Noise_sigma={config["obs_noise_sigma"]}\n'
         f'Act Noise_mu={config["act_noise_mu"]}, Act Noise_sigma={config["act_noise_sigma"]}\n'
-        f'Act cost={config["action_cost"]}, Sampling method={config["sampling_method"]}\n'
-        f'Plan Width={config["planning_width"]}, Episodes={config["n_episodes"]}, Timesteps={config["time_steps"]}',
-        fontsize=12
+        f'Act cost={config["action_cost"]}, Sampling method={config["control_model"]}\n'
+        f'Plan Width={config["planning_width"]}, Episodes={config["n_episodes"]}, Timesteps={config["time_steps"]}\n'
+        f'Value={config["value"]}' + (f', RL Model={config["rl_model"]}' if config["value"] == 'rl' else '')
     )
+
+    plt.suptitle(title, fontsize=12)
+
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
 
@@ -383,7 +389,7 @@ def analyze_and_plot_results(config=None, timestamp=None):
     if config is not None:
         for key, value in config.items():
             # Determine if the key is for filtering or for configuration
-            if key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma']:  # Extend as needed
+            if key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma', 'control_model']:  # Extend as needed
                 filter_criteria[key] = value
             else:
                 custom_plotting_config[key] = value

@@ -2,6 +2,8 @@ import numpy as np
 import mujoco
 import copy
 from scipy.linalg import expm, svd
+import torch
+from stable_baselines3 import TD3
 
 class BirdWorldModel:
     """ What the bird thinks."""
@@ -112,7 +114,7 @@ class BirdWorld:
 
 class MPCShittyBird:
     """ Doesn't aspire to much. """
-    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco', action_cost=0.0, sampling_method='random'):
+    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco', action_cost=0.0, control_model='random', value='env', rl_model='50k'):
         # Model parameters
         self.n_actions = n_actions      # Number of actions available
         self.recompute = recompute      # How often to recompute the control trajectory
@@ -127,8 +129,35 @@ class MPCShittyBird:
         self.reward_type = reward_type # rewards are discrete or continuous
         self.model_type  = model_type   # 'mujoco' or 'linear_full' or 'linear_reduced_<int>'
         self.action_cost = action_cost
-        self.sampling_method = sampling_method  # 'random' or 'predictive'
+        self.control_model = control_model  # 'random' or 'predictive' or 'rl'
 
+        self.rl_model = rl_model  # Name of the RL model to use, if applicable
+        self.value = value  # 'env' or 'rl' to use MuJoCo env or RL model
+        
+        if self.value == 'rl':
+            # If using RL, we need to initialize the model
+            
+
+            # self.model = TD3.load("td3_invertedpendulum_continuous_50k_steps")
+
+            model_files = {
+                '10k': "../rl_models/td3_invertedpendulum_continuous_10k_steps",
+                '50k': "../rl_models/td3_invertedpendulum_continuous_50k_steps", 
+                '100k': "../rl_models/td3_invertedpendulum_continuous_100k_steps",
+                '300k': "../rl_models/td3_invertedpendulum_continuous_300k_steps", 
+                '500k': "../rl_models/td3_invertedpendulum_continuous_500k_steps"
+            }
+            
+            # Remove the for loop and directly check the model name
+            if self.rl_model in model_files:
+                try:
+                    self.model = TD3.load(model_files[self.rl_model])
+                    print(f"✓ Loaded {self.rl_model} model")
+                except Exception as e:
+                    print(f"✗ Failed to load {self.rl_model} model: {e}")
+            else:
+                print(f"✗ Unknown model name: {self.rl_model}. Available: {list(model_files.keys())}")
+  
     def init_transition_model(self, world):
         """  """
         self.world_transition = world.transition
@@ -260,7 +289,20 @@ class MPCShittyBird:
             if self.reward_type == 'discrete':
                 return reward, next_obs
             elif self.reward_type == 'continuous':
-                reward = -np.abs(next_obs[1])  # negative absolute angle
+                if self.value == 'env':
+                    # Use MuJoCo's reward directly
+                    reward = -np.abs(next_obs[1])  # negative absolute angle
+                elif self.value == 'rl':
+                    # First, get the action from the learned policy
+                    action, _ = self.model.predict(obs, deterministic=True)
+                    
+                    # Then get Q(s, π(s)) which approximates V(s)
+                    critic_output = self.model.critic(
+                        torch.as_tensor(obs.reshape(1, -1), dtype=torch.float32),
+                        torch.as_tensor(action.reshape(1, -1), dtype=torch.float32)
+                    )
+                    reward = critic_output[0].detach().numpy()[0][0]
+                
                 return reward, next_obs
 
         else:
@@ -279,26 +321,64 @@ class MPCShittyBird:
         Model Predictive Control policy that can use either:
         - 'random': Random Shooting (uniform random sampling)
         - 'predictive': Predictive Sampling (persistent nominal trajectory with noise)
+        - 'rl': RL-guided Predictive Sampling (use TD3 model as nominal trajectory)
         """
-        # Initialize persistent nominal trajectory if using Predictive Sampling
-        if not hasattr(self, 'nominal_trajectory') and hasattr(self, 'sampling_method') and self.sampling_method == 'predictive':
+        # Initialize persistent nominal trajectory if using Predictive Sampling or RL
+        if not hasattr(self, 'nominal_trajectory') and self.control_model in ['predictive', 'rl']:
             self.nominal_trajectory = np.zeros([self.n_planning, *env.action_space.shape])
         
-        # Save environment state
+        # Save environment state (Fix #8: use regular copy instead of deepcopy)
         if self.model_type == 'mujoco':
-            saved_qpos = copy.deepcopy(env.unwrapped.data.qpos)
-            saved_qvel = copy.deepcopy(env.unwrapped.data.qvel)
+            saved_qpos = env.unwrapped.data.qpos.copy()
+            saved_qvel = env.unwrapped.data.qvel.copy()
         else:
             initial_obs = obs.copy()
 
         # Initialize data structures
         cumulative_reward = np.zeros(self.planning_width)
-        cummulative_action = np.zeros(self.planning_width)  # Kept for compatibility
+        cummulative_action = np.zeros(self.planning_width)
         actions = np.zeros([self.planning_width, self.n_planning, *env.action_space.shape])
 
         # Generate candidate trajectories based on sampling method
-        if hasattr(self, 'sampling_method') and self.sampling_method == 'predictive':
-            # --- Predictive Sampling ---
+        if self.control_model == 'rl':
+            # --- RL-guided Predictive Sampling ---
+            # Generate nominal trajectory using RL model
+            if self.model_type == 'mujoco':
+                self.restore_state(env, saved_qpos, saved_qvel)
+                current_obs = obs.copy()
+            else:
+                current_obs = initial_obs.copy()
+            
+            nominal_actions = []
+            for step in range(self.n_planning):
+                # Get action from RL model (deterministic for nominal trajectory)
+                action, _ = self.model.predict(current_obs, deterministic=True)
+                nominal_actions.append(action.copy())
+                
+                # Move to next state for next prediction
+                if step < self.n_planning - 1:
+                    _, next_obs = self.take_step(env, current_obs, action)
+                    current_obs = next_obs
+            
+            self.nominal_trajectory = np.array(nominal_actions)
+            
+            # Fix #1: Restore state after generating nominal trajectory
+            if self.model_type == 'mujoco':
+                self.restore_state(env, saved_qpos, saved_qvel)
+            
+            # First candidate is the pure RL policy (max Q-value trajectory)
+            actions[0] = self.nominal_trajectory
+            
+            # If planning_width > 1, generate noisy variations
+            if self.planning_width > 1:
+                noise_std = 0.1 * (env.action_space.high - env.action_space.low)
+                for i in range(1, self.planning_width):
+                    noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
+                    actions[i] = self.nominal_trajectory + noise
+                    actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
+
+        elif self.control_model == 'predictive':
+            # --- Standard Predictive Sampling ---
             # Shift previous best trajectory forward
             if self.n_planning > 1:
                 self.nominal_trajectory = np.vstack([
@@ -310,21 +390,21 @@ class MPCShittyBird:
             actions[0] = self.nominal_trajectory
             
             # Generate noisy variations for other candidates
-            noise_std = 0.1 * (env.action_space.high - env.action_space.low)
-            for i in range(1, self.planning_width):
-                noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
-                actions[i] = self.nominal_trajectory + noise
-                actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
+            if self.planning_width > 1:
+                noise_std = 0.1 * (env.action_space.high - env.action_space.low)
+                for i in range(1, self.planning_width):
+                    noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
+                    actions[i] = self.nominal_trajectory + noise
+                    actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
         else:
             # --- Random Shooting ---
-            # Generate all random trajectories at once using vectorization
             low = env.action_space.low
             high = env.action_space.high
             actions = np.random.uniform(
-                low=low,
-                high=high,
+                low=low, high=high,
                 size=(self.planning_width, self.n_planning) + np.shape(low)
-)
+            )
+
         # Evaluate all trajectories
         for i_trajectory in range(self.planning_width):
             if self.model_type == 'mujoco':
@@ -341,7 +421,7 @@ class MPCShittyBird:
                 reward -= self.action_cost * np.sum(np.square(action))
 
                 cumulative_reward[i_trajectory] += reward
-                cummulative_action[i_trajectory] += np.abs(action)  # Kept for compatibility
+                cummulative_action[i_trajectory] += np.abs(action)
                 current_obs = next_obs
 
         # Restore environment state
@@ -352,14 +432,12 @@ class MPCShittyBird:
         best_trajectory = np.argmax(cumulative_reward)
         best_action_trajectory = actions[best_trajectory]
         
-        # Update nominal trajectory if using Predictive Sampling
-        if hasattr(self, 'sampling_method') and self.sampling_method == 'predictive':
+        # Update nominal trajectory if using any predictive method
+        if self.control_model in ['predictive', 'rl']:
             self.nominal_trajectory = best_action_trajectory
         
         # Return the best policy from this state forward
         return best_action_trajectory
-    
-
 
 
     def get_forward_policy(self, state):
