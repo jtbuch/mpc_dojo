@@ -27,7 +27,7 @@ declare -a obs_noises=(0.0)
 declare -a action_noises=(0.0)
 declare -a obs_mus=(0.0)
 declare -a action_mus=(0.0)
-declare -a control_models=("rl") # "predictive" "rl"
+declare -a control_models=("predictive" "rl") # "predictive" "rl"
 declare -a values=("rl")
 declare -a rl_models=("50k" "300k") # "50k" "
 

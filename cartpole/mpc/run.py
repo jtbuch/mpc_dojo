@@ -51,11 +51,11 @@ config = {
     'n_episodes': 2,
     'time_steps': 100,
     'action_cost': 0.2,
-    'control_model': [control_model],
+    'control_model': control_model,
     'recompute_intervals': [recompute_interval],  # Use the command line argument
     'n_planning_values': [n_planning],             # Use the command line argument
-    'value': [value],
-    'rl_model': [rl_model]  # Use the command line argument
+    'value': value,
+    'rl_model': rl_model  # Use the command line argument
 }
 
 # Run the simulation
