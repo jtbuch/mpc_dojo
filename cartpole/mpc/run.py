@@ -22,16 +22,34 @@ rl_model = sys.argv[9]  # Name of the RL model to use
 print(f"Running simulation with recompute_interval={recompute_interval}, n_planning={n_planning}, obs_noise={obs_noise}, obs_mu={obs_mu}, act_noise={act_noise}, act_mu={act_mu}")
 
 # Define configuration
+# config = {
+#     'planning_width': 200,
+#     'reward_type': 'continuous',
+#     'model_type': 'mujoco',
+#     'obs_noise_mu': np.array([obs_mu, obs_mu, obs_mu*0.1, obs_mu*0.1]),
+#     'obs_noise_sigma': np.array([obs_noise, obs_noise, obs_noise*0.1, obs_noise*0.1]),
+#     'act_noise_mu': np.array([act_mu]),
+#     'act_noise_sigma': np.array([act_noise]),
+#     'n_episodes': 20,
+#     'time_steps': 1000,
+#     'action_cost': 0.2,
+#     'control_model': [control_model],
+#     'recompute_intervals': [recompute_interval],  # Use the command line argument
+#     'n_planning_values': [n_planning],             # Use the command line argument
+#     'value': [value],
+#     'rl_model': [rl_model]  # Use the command line argument
+# }
+
 config = {
-    'planning_width': 200,
+    'planning_width': 10,
     'reward_type': 'continuous',
     'model_type': 'mujoco',
     'obs_noise_mu': np.array([obs_mu, obs_mu, obs_mu*0.1, obs_mu*0.1]),
     'obs_noise_sigma': np.array([obs_noise, obs_noise, obs_noise*0.1, obs_noise*0.1]),
     'act_noise_mu': np.array([act_mu]),
     'act_noise_sigma': np.array([act_noise]),
-    'n_episodes': 20,
-    'time_steps': 1000,
+    'n_episodes': 2,
+    'time_steps': 100,
     'action_cost': 0.2,
     'control_model': [control_model],
     'recompute_intervals': [recompute_interval],  # Use the command line argument
