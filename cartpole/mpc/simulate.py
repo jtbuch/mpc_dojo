@@ -391,7 +391,7 @@ def analyze_and_plot_results(config=None, timestamp=None):
     if config is not None:
         for key, value in config.items():
             # Determine if the key is for filtering or for configuration
-            if key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value']:  # Extend as needed
+            if key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:  # Extend as needed
                 filter_criteria[key] = value
             else:
                 custom_plotting_config[key] = value
