@@ -287,7 +287,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
         f'Reward and Termination Step across Planning & Recompute Intervals\n'
         f'Obs Noise_mu={config["obs_noise_mu"]}, Obs Noise_sigma={config["obs_noise_sigma"]}\n'
         f'Act Noise_mu={config["act_noise_mu"]}, Act Noise_sigma={config["act_noise_sigma"]}\n'
-        f'Act cost={config["action_cost"]}, Sampling method={config["control_model"]}\n'
+        f'Act cost={config["action_cost"]}, Control model={config["control_model"]}\n'
         f'Plan Width={config["planning_width"]}, Episodes={config["n_episodes"]}, Timesteps={config["time_steps"]}\n'
         f'Value={config["value"]}' + (f', RL Model={config["rl_model"]}' if config["value"] == 'rl' else '')
     )
