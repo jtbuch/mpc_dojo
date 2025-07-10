@@ -263,6 +263,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].set_xlabel('n_planning')
     axs[0].set_ylabel('Avg Reward (± SEM)')
     axs[0].set_ylim(-2,0.1)
+    axs[0].set_xlim(0,100)
     axs[0].grid(True)
     axs[0].legend()
     
@@ -279,6 +280,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[1].set_xlabel('n_planning')
     axs[1].set_ylabel('Step where |angle| > 1.5 (± SEM)')
     axs[1].set_ylim(0, config['time_steps'] + 5)
+    axs[1].set_xlim(0,100)
     axs[1].grid(True)
     axs[1].legend()
     axs[1].axhline(y=config['time_steps'], color='r', linestyle='--', label='Max Time Steps')
@@ -419,12 +421,6 @@ def analyze_and_plot_results(config=None, timestamp=None):
     
     # Update plotting configuration parameters if not overridden
     config.update(custom_plotting_config)
-
-    # Save combined results
-    # combined_results_file = os.path.join(results_dir, f"combined_results_{timestamp}.pkl")
-    # with open(combined_results_file, 'wb') as f:
-    #     pickle.dump(filtered_results, f)
-    # print(f"Combined results saved to {combined_results_file}")
     
     # Compute statistics
     results_with_stats, termination_with_stats = compute_stats(filtered_results)
