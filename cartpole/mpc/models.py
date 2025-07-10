@@ -271,7 +271,7 @@ class MPCShittyBird:
                     actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
 
         elif self.control_model == 'predictive':
-            # --- Standard Predictive Sampling ---
+            # Predictive sampling (Algorithm 4 in: Howell, T., Gileadi, N., Tunyasuvunakool, S., Zakka, K., Erez, T., & Tassa, Y. (2022). Predictive sampling: Real-time behaviour synthesis with mujoco. arXiv preprint arXiv:2212.00541.)
             # Shift previous best trajectory forward
             if self.n_planning > 1:
                 self.nominal_trajectory = np.vstack([
