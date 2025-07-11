@@ -21,7 +21,7 @@ class MPCShittyBird:
 
         self.reward_type = reward_type # rewards are discrete or continuous
         self.action_cost = action_cost
-        self.control_model = control_model  # 'random' or 'predictive' or 'rl'
+        self.control_model = control_model  # 'random' or 'predictive' 
 
         self.rl_model = rl_model  # Name of the RL model to use, if applicable
         self.value = value  # 'env' or 'rl' to use MuJoCo env or RL model
@@ -46,32 +46,6 @@ class MPCShittyBird:
             else:
                 print(f"✗ Unknown model name: {self.rl_model}. Available: {list(model_files.keys())}")
   
-    def init_transition_model(self, world):
-        """  """
-        self.world_transition = world.transition
-        self.world_reward     = world.reward
-
-    def transition_model(self, state, action):
-        """ Bird's model of the world's transition structure. """
-        next_state = self.world_transition(state, action)
-        reward     = self.world_reward(next_state)
-        return next_state, reward
-    
-    def policy(self, state):
-        """ Could implement better policies here. """
-
-        # Only occasionally recompute stored policy (really, control trajectory)
-        if self.control_step % self.recompute == 0:
-            self.control_trajectory = self.get_forward_policy(state)
-
-        # Return the first action in the control trajectory
-        return self.control_trajectory[self.control_step]
-
-    def register_action(self):
-        """ Register that an action has been taken. """
-        self.control_step += 1
-        self.control_step %= self.recompute
-
     def restore_state(self, env, qpos, qvel):
         # Restore the environment's state
         env.unwrapped.data.qpos[:] = qpos
@@ -81,69 +55,85 @@ class MPCShittyBird:
         # This function ensures that all the states are correctly computed after restoring the qpos and qvel.
         mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
 
-    
-    def take_step(self, env, obs, action):
+    def calculate_trajectory_rewards(self, env, actions, observations, discrete_rewards, done_flags):
         """
         Compute reward based on MuJoCo env step.
 
         Parameters:
         - env: the gymnasium environment object.
-        - obs: current state (numpy array or scalar).
-        - action: control input/action (numpy array or scalar).
+        - actions: actions taken during the trajectory [planning_width, n_planning, action_dim]
+        - observations: states observed during the trajectory [planning_width, n_planning, obs_dim]
+        - discrete_rewards: rewards received at each step [planning_width, n_planning]
+        - done_flags: flags indicating if the episode ended at each step [planning_width, n_planning]
 
         Returns:
-        - reward: reward computed based on selected method.
+        - cumulative_reward: array of cumulative rewards for each trajectory [planning_width]
         """
-        # Use MuJoCo step to get next obs and reward
-        next_obs, reward, done, truncated, info = env.step(action)
         
         if self.reward_type == 'discrete':
-            return reward, next_obs
+            return discrete_rewards.sum(axis=1)
+        
         elif self.reward_type == 'continuous':
             if self.value == 'env':
-          
+                # Fully vectorized env rewards!
+                # All operations work element-wise on the [planning_width, n_planning] arrays
+                
                 # Base reward for staying alive
-                reward = 1.0
+                reward = np.ones_like(observations[:, :, 0])  # [planning_width, n_planning]
                 
                 # Angle reward (most important - stay upright)
-                angle_reward = np.exp(-5 * next_obs[1]**2)
+                angle_reward = np.exp(-5 * observations[:, :, 1]**2)
                 reward += 2.0 * angle_reward
                 
                 # Position reward (stay centered)
-                position_reward = np.exp(-0.5 * next_obs[1]**2)
+                position_reward = np.exp(-0.5 * observations[:, :, 0]**2)
                 reward += 0.5 * position_reward
                 
                 # Stability reward (minimize velocities)
-                velocity_penalty = 0.1 * (next_obs[2]**2 + next_obs[3]**2)
+                velocity_penalty = 0.1 * (observations[:, :, 2]**2 + observations[:, :, 3]**2)
                 reward -= velocity_penalty
                 
                 # Large penalty for falling
-                if done:
-                    reward -= 10.0
+                reward -= 10.0 * done_flags  # done_flags is boolean, converts to 0/1
                 
                 # Bonus for being very stable
-                if abs(next_obs[1]) < 0.1 and abs(next_obs[3]) < 0.1:
-                    reward += 0.5
+                stable_angle = np.abs(observations[:, :, 1]) < 0.1
+                stable_velocity = np.abs(observations[:, :, 3]) < 0.1
+                stability_bonus = stable_angle & stable_velocity
+                reward += 0.5 * stability_bonus
+                
+                # Sum over planning steps
+                cumulative_reward = reward.sum(axis=1)
+                
+                return cumulative_reward
 
             elif self.value == 'rl':
-                # First, get the action from the learned policy
-                action, _ = self.model.predict(obs, deterministic=True)
+                # For RL rewards, we can also vectorize completely!
+                # Reshape observations to [batch_size, obs_dim] where batch_size = planning_width * n_planning
+                batch_size = self.planning_width * self.n_planning
+                obs_batch = observations.reshape(batch_size, -1)
                 
-                # Then get Q(s, π(s)) which approximates V(s)
-                critic_output = self.model.critic(
-                    torch.as_tensor(obs.reshape(1, -1), dtype=torch.float32),
-                    torch.as_tensor(action.reshape(1, -1), dtype=torch.float32)
-                )
-                reward = critic_output[0].detach().numpy()[0][0]
-        
-        return reward, next_obs
+                # Get actions from the learned policy for all observations at once
+                with torch.no_grad():
+                    obs_tensor = torch.as_tensor(obs_batch, dtype=torch.float32)
+                    actions_batch, _ = self.model.predict(obs_batch, deterministic=True)
+                    actions_tensor = torch.as_tensor(actions_batch, dtype=torch.float32)
+                    
+                    # Get Q(s, π(s)) for all state-action pairs at once
+                    critic_output = self.model.critic(obs_tensor, actions_tensor)
+                    rewards_batch = critic_output[0].detach().numpy().flatten()
+                
+                # Reshape back to [planning_width, n_planning] and sum over planning steps
+                rewards_matrix = rewards_batch.reshape(self.planning_width, self.n_planning)
+                cumulative_reward = rewards_matrix.sum(axis=1)
+                
+                return cumulative_reward
 
     def mujoco_policy(self, env, obs):
         """
         Model Predictive Control policy that can use either:
         - 'random': Random Shooting (uniform random sampling)
         - 'predictive': Predictive Sampling (persistent nominal trajectory with noise)
-        - 'rl': RL-guided Predictive Sampling (use TD3 model as nominal trajectory)
         """
         # Initialize persistent nominal trajectory if using Predictive Sampling or RL
         if not hasattr(self, 'nominal_trajectory') and self.control_model in ['predictive', 'rl']:
@@ -152,40 +142,24 @@ class MPCShittyBird:
         # Save environment state 
         saved_qpos = env.unwrapped.data.qpos.copy()
         saved_qvel = env.unwrapped.data.qvel.copy()
-  
 
         # Initialize data structures
-        cumulative_reward = np.zeros(self.planning_width)
-        cummulative_action = np.zeros(self.planning_width)
         actions = np.zeros([self.planning_width, self.n_planning, *env.action_space.shape])
+        observations = np.zeros([self.planning_width, self.n_planning, *env.observation_space.shape])
+        discrete_rewards = np.zeros([self.planning_width, self.n_planning])
+        done_flags = np.zeros([self.planning_width, self.n_planning], dtype=bool)
+        cumulative_reward = np.zeros([self.planning_width])
 
-        # Generate candidate trajectories based on sampling method
+        # Generate candidate trajectories based on the control method
+
+        # ----------------------------------------------------------------------------------------------
+        # Predictive sampling starting from the RL deterministic policy
+        # ----------------------------------------------------------------------------------------------
         if self.control_model == 'rl':
-            # --- RL-guided Predictive Sampling ---
-            # Generate nominal trajectory using RL model
-            self.restore_state(env, saved_qpos, saved_qvel)
-            current_obs = obs.copy()
-            
-            nominal_actions = []
-            for step in range(self.n_planning):
-                # Get action from RL model (deterministic for nominal trajectory)
-                action, _ = self.model.predict(current_obs, deterministic=True)
-                nominal_actions.append(action.copy())
-                
-                # Move to next state for next prediction
-                if step < self.n_planning - 1:
-                    _, next_obs = self.take_step(env, current_obs, action)
-                    current_obs = next_obs
-            
-            self.nominal_trajectory = np.array(nominal_actions)
-            
-            # Restore state after generating nominal trajectory
-            self.restore_state(env, saved_qpos, saved_qvel)
-            
-            # First candidate is the pure RL policy (max Q-value trajectory)
-            actions[0] = self.nominal_trajectory
-            
-            # If planning_width > 1, generate noisy variations
+            # If using RL, we need to get the action from the learned policy
+            actions[0] = np.array([self.model.predict(obs, deterministic=True)[0] for _ in range(self.n_planning)])
+            self.nominal_trajectory = actions[0]
+            # Generate noisy variations for other candidates
             if self.planning_width > 1:
                 noise_std = 0.1 * (env.action_space.high - env.action_space.low)
                 for i in range(1, self.planning_width):
@@ -193,8 +167,10 @@ class MPCShittyBird:
                     actions[i] = self.nominal_trajectory + noise
                     actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
 
+        # ----------------------------------------------------------------------------------------------
+        # Predictive sampling starting from zeros (Algorithm 4 in: Howell, T., Gileadi, N., Tunyasuvunakool, S., Zakka, K., Erez, T., & Tassa, Y. (2022). Predictive sampling: Real-time behaviour synthesis with mujoco. arXiv preprint arXiv:2212.00541.)
+        # ----------------------------------------------------------------------------------------------
         elif self.control_model == 'predictive':
-            # Predictive sampling (Algorithm 4 in: Howell, T., Gileadi, N., Tunyasuvunakool, S., Zakka, K., Erez, T., & Tassa, Y. (2022). Predictive sampling: Real-time behaviour synthesis with mujoco. arXiv preprint arXiv:2212.00541.)
             # Shift previous best trajectory forward
             if self.n_planning > 1:
                 self.nominal_trajectory = np.vstack([
@@ -212,8 +188,11 @@ class MPCShittyBird:
                     noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
                     actions[i] = self.nominal_trajectory + noise
                     actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
-        else:
-            # --- Random Shooting ---
+
+        # ----------------------------------------------------------------------------------------------
+        # Random Shooting (uniform random sampling)
+        # ----------------------------------------------------------------------------------------------
+        elif self.control_model == 'random':
             low = env.action_space.low
             high = env.action_space.high
             actions = np.random.uniform(
@@ -221,18 +200,22 @@ class MPCShittyBird:
                 size=(self.planning_width, self.n_planning) + np.shape(low)
             )
 
+        # ----------------------------------------------------------------------------------------------
         # Evaluate all trajectories
+        # ----------------------------------------------------------------------------------------------
         for i_trajectory in range(self.planning_width):
             self.restore_state(env, saved_qpos, saved_qvel)
             current_obs = obs.copy()
 
             for step in range(self.n_planning):
                 action = actions[i_trajectory, step]
-                reward, next_obs = self.take_step(env, current_obs, action)
+                next_obs, reward, done, truncated, info = env.step(action) 
+                observations[i_trajectory, step] = next_obs
+                discrete_rewards[i_trajectory, step] = reward
+                done_flags[i_trajectory, step] = done
 
-                cumulative_reward[i_trajectory] += reward
-                cummulative_action[i_trajectory] += np.abs(action)
-                current_obs = next_obs
+        # Calculate cumulative rewards for each trajectory
+        cumulative_reward = self.calculate_trajectory_rewards(env, actions, observations, discrete_rewards, done_flags)
 
         # Restore environment state
         self.restore_state(env, saved_qpos, saved_qvel)
