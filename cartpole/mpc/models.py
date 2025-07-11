@@ -7,7 +7,7 @@ from stable_baselines3 import TD3
 
 class MPCShittyBird:
     """ Doesn't aspire to much. """
-    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', model_type='mujoco', action_cost=0.0, control_model='random', value='env', rl_model='50k'):
+    def __init__(self, n_actions, recompute = 10, planning_width = 5, n_planning = 10, reward_type='discrete', action_cost=0.0, control_model='random', value='env', rl_model='50k'):
         # Model parameters
         self.n_actions = n_actions      # Number of actions available
         self.recompute = recompute      # How often to recompute the control trajectory
@@ -20,7 +20,6 @@ class MPCShittyBird:
         self.epsilon        = 0.2       # Epsilon greedy action selection
 
         self.reward_type = reward_type # rewards are discrete or continuous
-        self.model_type  = model_type   # 'mujoco' or 'linear_full' or 'linear_reduced_<int>'
         self.action_cost = action_cost
         self.control_model = control_model  # 'random' or 'predictive' or 'rl'
 
@@ -29,10 +28,6 @@ class MPCShittyBird:
         
         if self.value == 'rl':
             # If using RL, we need to initialize the model
-            
-
-            # self.model = TD3.load("td3_invertedpendulum_continuous_50k_steps")
-
             model_files = {
                 '10k': "../rl_models/td3_invertedpendulum_continuous_10k_steps",
                 '50k': "../rl_models/td3_invertedpendulum_continuous_50k_steps", 
@@ -86,87 +81,10 @@ class MPCShittyBird:
         # This function ensures that all the states are correctly computed after restoring the qpos and qvel.
         mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
 
-    def predict_next_state_inverted_pendulum(self, env, obs, action):
-        """
-        Predict next state for InvertedPendulum-v5 using linearized model,
-        with rank determined by self.model_type:
-        - 'linear_full' uses full rank A
-        - 'linear_reduced_<int>' uses that integer as rank for reduced A
-
-        Parameters:
-        - env: the gymnasium environment object.
-        - obs: current state (numpy array or scalar, shape=(4,))
-        - action: control input (numpy array or scalar, shape=(1,))
-
-        Returns:
-        - next_obs: predicted next state (numpy array)
-        """
-
-        # # Continuous-time linearized system matrices
-        # A_c = np.array([
-        #     [0, 0, 1, 0],
-        #     [0, 0, 0, 1],
-        #     [0, -2.90535, -0.08367, 0.19671],
-        #     [0, 29.89257, 0.19671, -2.02391]
-        # ])
-
-        # B_c = np.array([
-        #     [0],
-        #     [0],
-        #     [8.36743],
-        #     [-19.67105]
-        # ])
-
-        # From mujoco using mujoco.mjd_transitionFD(model, data, epsilon, centered, A, B, None, None)
-        A_d = np.array([
-            [1.00000000, -0.00111508,  0.01996688,  0.00007550],
-            [0.00000000,  1.01148765,  0.00007550,  0.01922222],
-            [0.00000000, -0.05575393,  0.99834413,  0.00377490],
-            [0.00000000,  0.57438229,  0.00377490,  0.96111076]
-        ])
-
-        B_d = np.array([
-            [ 0.00331173],
-            [-0.00754979],
-            [ 0.16558646],
-            [-0.37748958]
-        ])
-
-        # Discretize A and B
-        dt = env.unwrapped.model.opt.timestep
-        n = A_d.shape[0]
-        m = B_d.shape[1]
-
-        # Determine rank from self.model_type
-        rank = None
-        if hasattr(self, 'model_type'):
-            if self.model_type == 'linear_full':
-                rank = None
-            elif self.model_type.startswith('linear_reduced_'):
-                try:
-                    rank = int(self.model_type.split('_')[-1])
-                    if rank > n:
-                        rank = n  # cap rank at full size
-                except ValueError:
-                    rank = None  # fallback to full rank if parsing fails
-
-        # Apply rank reduction if requested
-        if rank is not None and rank < A_d.shape[0]:
-            U, S, Vh = svd(A_d)
-            S_reduced = np.zeros_like(S)
-            S_reduced[:rank] = S[:rank]
-            A_d = U @ np.diag(S_reduced) @ Vh
-
-        obs = np.array(obs)
-        action = np.atleast_1d(action)
-
-        next_obs = A_d @ obs + B_d @ action
-
-        return next_obs
     
     def take_step(self, env, obs, action):
         """
-        Compute reward based on either MuJoCo env step (model_type='mujoco') or linearized model prediction (reduced ('linear') or not ('reduced')).
+        Compute reward based on MuJoCo env step.
 
         Parameters:
         - env: the gymnasium environment object.
@@ -176,37 +94,48 @@ class MPCShittyBird:
         Returns:
         - reward: reward computed based on selected method.
         """
-        if self.model_type == 'mujoco':
-            # Use MuJoCo step to get next obs and reward
-            next_obs, reward, done, truncated, info = env.step(action)
-            if self.reward_type == 'discrete':
-                return reward, next_obs
-            elif self.reward_type == 'continuous':
-                if self.value == 'env':
-                    # Use MuJoCo's reward directly
-                    reward = -np.abs(next_obs[1])  # negative absolute angle
-                elif self.value == 'rl':
-                    # First, get the action from the learned policy
-                    action, _ = self.model.predict(obs, deterministic=True)
-                    
-                    # Then get Q(s, π(s)) which approximates V(s)
-                    critic_output = self.model.critic(
-                        torch.as_tensor(obs.reshape(1, -1), dtype=torch.float32),
-                        torch.as_tensor(action.reshape(1, -1), dtype=torch.float32)
-                    )
-                    reward = critic_output[0].detach().numpy()[0][0]
+        # Use MuJoCo step to get next obs and reward
+        next_obs, reward, done, truncated, info = env.step(action)
+        
+        if self.reward_type == 'discrete':
+            return reward, next_obs
+        elif self.reward_type == 'continuous':
+            if self.value == 'env':
+          
+                # Base reward for staying alive
+                reward = 1.0
                 
-                return reward, next_obs
+                # Angle reward (most important - stay upright)
+                angle_reward = np.exp(-5 * next_obs[1]**2)
+                reward += 2.0 * angle_reward
+                
+                # Position reward (stay centered)
+                position_reward = np.exp(-0.5 * next_obs[1]**2)
+                reward += 0.5 * position_reward
+                
+                # Stability reward (minimize velocities)
+                velocity_penalty = 0.1 * (next_obs[2]**2 + next_obs[3]**2)
+                reward -= velocity_penalty
+                
+                # Large penalty for falling
+                if done:
+                    reward -= 10.0
+                
+                # Bonus for being very stable
+                if abs(next_obs[1]) < 0.1 and abs(next_obs[3]) < 0.1:
+                    reward += 0.5
 
-        else:
-            # Use linearized discrete model to predict next state and compute reward
-            next_obs = self.predict_next_state_inverted_pendulum(env, obs, action)
-
-            if self.reward_type == 'discrete':
-                reward = 1.0 if (-0.2 <= next_obs[1] <= 0.2) else 0.0
-            elif self.reward_type == 'continuous':
-                reward = -np.abs(next_obs[1])
-            
+            elif self.value == 'rl':
+                # First, get the action from the learned policy
+                action, _ = self.model.predict(obs, deterministic=True)
+                
+                # Then get Q(s, π(s)) which approximates V(s)
+                critic_output = self.model.critic(
+                    torch.as_tensor(obs.reshape(1, -1), dtype=torch.float32),
+                    torch.as_tensor(action.reshape(1, -1), dtype=torch.float32)
+                )
+                reward = critic_output[0].detach().numpy()[0][0]
+        
         return reward, next_obs
 
     def mujoco_policy(self, env, obs):
@@ -220,12 +149,10 @@ class MPCShittyBird:
         if not hasattr(self, 'nominal_trajectory') and self.control_model in ['predictive', 'rl']:
             self.nominal_trajectory = np.zeros([self.n_planning, *env.action_space.shape])
         
-        # Save environment state (Fix #8: use regular copy instead of deepcopy)
-        if self.model_type == 'mujoco':
-            saved_qpos = env.unwrapped.data.qpos.copy()
-            saved_qvel = env.unwrapped.data.qvel.copy()
-        else:
-            initial_obs = obs.copy()
+        # Save environment state 
+        saved_qpos = env.unwrapped.data.qpos.copy()
+        saved_qvel = env.unwrapped.data.qvel.copy()
+  
 
         # Initialize data structures
         cumulative_reward = np.zeros(self.planning_width)
@@ -236,11 +163,8 @@ class MPCShittyBird:
         if self.control_model == 'rl':
             # --- RL-guided Predictive Sampling ---
             # Generate nominal trajectory using RL model
-            if self.model_type == 'mujoco':
-                self.restore_state(env, saved_qpos, saved_qvel)
-                current_obs = obs.copy()
-            else:
-                current_obs = initial_obs.copy()
+            self.restore_state(env, saved_qpos, saved_qvel)
+            current_obs = obs.copy()
             
             nominal_actions = []
             for step in range(self.n_planning):
@@ -255,9 +179,8 @@ class MPCShittyBird:
             
             self.nominal_trajectory = np.array(nominal_actions)
             
-            # Fix #1: Restore state after generating nominal trajectory
-            if self.model_type == 'mujoco':
-                self.restore_state(env, saved_qpos, saved_qvel)
+            # Restore state after generating nominal trajectory
+            self.restore_state(env, saved_qpos, saved_qvel)
             
             # First candidate is the pure RL policy (max Q-value trajectory)
             actions[0] = self.nominal_trajectory
@@ -300,26 +223,19 @@ class MPCShittyBird:
 
         # Evaluate all trajectories
         for i_trajectory in range(self.planning_width):
-            if self.model_type == 'mujoco':
-                self.restore_state(env, saved_qpos, saved_qvel)
-                current_obs = obs.copy()
-            else:
-                current_obs = initial_obs.copy()
+            self.restore_state(env, saved_qpos, saved_qvel)
+            current_obs = obs.copy()
 
             for step in range(self.n_planning):
                 action = actions[i_trajectory, step]
                 reward, next_obs = self.take_step(env, current_obs, action)
-
-                # Subtract the squared action cost
-                reward -= self.action_cost * np.sum(np.square(action))
 
                 cumulative_reward[i_trajectory] += reward
                 cummulative_action[i_trajectory] += np.abs(action)
                 current_obs = next_obs
 
         # Restore environment state
-        if self.model_type == 'mujoco':
-            self.restore_state(env, saved_qpos, saved_qvel)
+        self.restore_state(env, saved_qpos, saved_qvel)
 
         # Select best trajectory
         best_trajectory = np.argmax(cumulative_reward)
@@ -332,57 +248,3 @@ class MPCShittyBird:
         # Return the best policy from this state forward
         return best_action_trajectory
 
-
-    def get_forward_policy(self, state):
-        """
-        Get the policy looking forward from a state.
-        Currently implemented as epsilon-greedy-n-step-lookahead
-        """
-
-        # Generate a set of trajectories to compare
-        trajectories = []
-        for i in range(self.planning_width):
-            trajectories.append(self.epsilon_greedy_n_step_lookahead(state))
-        
-        # Select the most rewarding trajectory
-        cumulative_rewards = [np.sum(t[2,:]) for t in trajectories]
-        best_trajectory = trajectories[np.argmax(cumulative_rewards)]
-
-        # Return the best policy from this state forward
-        return best_trajectory[0, :]
-
-    def update(self, state, action, reward, next_state, next_action):
-        """ Compatibility method for now. """
-        pass
-
-    def epsilon_greedy_n_step_lookahead(self, state):
-        
-        # Initialize memory for a trajectory
-        trajectory = np.zeros([3, self.n_planning], dtype=int)
-        
-        # Loop over planning steps filling out trajectory
-        for step in range(self.n_planning):
-            
-            # Initialize a memory for planning
-            planning_cache = np.zeros([2, self.n_actions])
-
-            for action in range(self.n_actions):
-                # Determine the outcome of this action
-                next_state, reward = self.transition_model(state, action)
-                
-                # Save what we see
-                planning_cache[0, action] = next_state
-                planning_cache[1, action] = reward
-
-            # Get the epsilon-greedy action
-            if np.random.rand() < self.epsilon:
-                best_action = np.random.randint(self.n_actions)
-            else:
-                best_action = np.argmax(planning_cache[1, :])
-    
-            # Save the best action, state, and reward
-            trajectory[0, step] = best_action
-            trajectory[1, step] = planning_cache[0, best_action]    # Best state
-            trajectory[2, step] = planning_cache[1, best_action]    # Best reward
-
-        return trajectory

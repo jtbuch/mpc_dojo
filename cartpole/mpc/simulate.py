@@ -56,9 +56,7 @@ def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noi
            
             # Add action noise
             action += rng.normal(act_noise_mu, act_noise_sigma)
-
-            # action += np.random.default_rng(episode_seed + t + 1).normal(act_noise_mu, act_noise_sigma)
-            
+           
             # Save the action before adding noise
             actions[t] = action            
 
@@ -66,18 +64,33 @@ def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noi
 
             # If the model is discrete keep reward as is, otherwise save obs[1] as reward
             if reward_type == 'discrete':
-                reward = reward - action_cost * np.sum(np.square(action[0]))  
+                reward = reward 
             elif reward_type == 'continuous':
-                reward = -np.abs(obs[1]) -action_cost * np.sum(np.square(action[0]))
-                # print(f"Observation at time {t}: {obs[1]}")
-                # print(f"Action cost at time {t}: {np.sum(np.square(action[0]))}")
-                # print(f"Reward at time {t}: {reward}")
-                # print(f"Action at time {t}: {action[0]}")
+                # Base reward for staying alive
+                reward = 1.0
+                
+                # Angle reward (most important - stay upright)
+                angle_reward = np.exp(-5 * obs[1]**2)
+                reward += 2.0 * angle_reward
+                
+                # Position reward (stay centered)
+                position_reward = np.exp(-0.5 * obs[1]**2)
+                reward += 0.5 * position_reward
+                
+                # Stability reward (minimize velocities)
+                velocity_penalty = 0.1 * (obs[2]**2 + obs[3]**2)
+                reward -= velocity_penalty
+                
+                # Large penalty for falling
+                if done:
+                    reward -= 10.0
+                
+                # Bonus for being very stable
+                if abs(obs[1]) < 0.1 and abs(obs[3]) < 0.1:
+                    reward += 0.5
 
             # Add observation noise
             obs += rng.normal(obs_noise_mu, obs_noise_sigma)
-
-            # obs += np.random.default_rng(episode_seed + t + 2).normal(obs_noise_mu, obs_noise_sigma)
 
             # Save the true observation before adding noise
             observations[t] = obs
@@ -134,7 +147,6 @@ def run_simulation(interval, n_planning, config):
         planning_width=config['planning_width'],
         n_planning=n_planning,
         reward_type=config['reward_type'],
-        model_type=config['model_type'],
         action_cost=config['action_cost'],
         control_model=config['control_model'],
         value=config['value'],
