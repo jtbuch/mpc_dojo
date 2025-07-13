@@ -19,7 +19,7 @@ declare -a obs_mus=(0.0 0.2)
 declare -a action_mus=(0.0 0.1)
 declare -a control_models=("rl")
 declare -a values=("rl")
-declare -a rl_models=("50k", "300k","500k", "1000k", "2000k")
+declare -a rl_models=("50k" "300k" "500k" "1000k" "2000k")
 
 
 # Loop over all parameters
