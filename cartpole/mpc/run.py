@@ -29,7 +29,7 @@ config = {
     'obs_noise_sigma': np.array([obs_noise, obs_noise, obs_noise*0.1, obs_noise*0.1]),
     'act_noise_mu': np.array([act_mu]),
     'act_noise_sigma': np.array([act_noise]),
-    'n_episodes': 10,
+    'n_episodes': 40,
     'time_steps': 1000,
     'action_cost': 0.2,
     'control_model': control_model,

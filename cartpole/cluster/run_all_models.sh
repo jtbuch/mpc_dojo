@@ -18,8 +18,8 @@ declare -a action_noises=(0.0 0.1)
 declare -a obs_mus=(0.0 0.2)
 declare -a action_mus=(0.0 0.1)
 declare -a control_models=("predictive")
-declare -a values=("env" "rl")
-declare -a rl_models=("50k")
+declare -a values=("rl")
+declare -a rl_models=("500k", "1000k")
 
 
 # Loop over all parameters
@@ -36,7 +36,7 @@ for interval in "${intervals[@]}"; do
                                     sbatch \
                                         --job-name="MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}_ctrl${control_model}_val${value}_rl${rl_model}" \
                                         --account=carney-ashenhav-condo \
-                                        --time=200:00:00 \
+                                        --time=100:00:00 \
                                         --mem=10G \
                                         --nodes=1 \
                                         -o "log/MPC_int${interval}_hor${horizon}_obsN${obs_noise}_actN${action_noise}_obsM${obs_mu}_actM${action_mu}_ctrl${control_model}_val${value}_rl${rl_model}.%j.out" \

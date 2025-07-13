@@ -33,7 +33,9 @@ class MPCShittyBird:
                 '50k': "../rl_models/td3_invertedpendulum_continuous_50k_steps", 
                 '100k': "../rl_models/td3_invertedpendulum_continuous_100k_steps",
                 '300k': "../rl_models/td3_invertedpendulum_continuous_300k_steps", 
-                '500k': "../rl_models/td3_invertedpendulum_continuous_500k_steps"
+                '500k': "../rl_models/td3_invertedpendulum_continuous_500k_steps",
+                '1000k': "../rl_models/td3_invertedpendulum_continuous_1000k_steps",
+                '2000k': "../rl_models/td3_invertedpendulum_continuous_2000k_steps",
             }
             
             # Remove the for loop and directly check the model name
