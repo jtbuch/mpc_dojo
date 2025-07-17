@@ -210,8 +210,18 @@ class MPCShittyBird:
             current_obs = obs.copy()
 
             for step in range(self.n_planning):
-                action = actions[i_trajectory, step]
-                next_obs, reward, done, truncated, info = env.step(action) 
+
+                if self.planning_width <2:
+                    # If using only RL and no planning, we need to get the action from the learned policy
+                    action = self.model.predict(current_obs, deterministic=True)[0]
+                    next_obs, reward, done, truncated, info = env.step(action)
+                elif self.planning_width >1:
+                    # Otherwise, use the sampled action
+                    action = actions[i_trajectory, step]
+                    next_obs, reward, done, truncated, info = env.step(action) 
+                    
+                # Save the action in the trajectory
+                actions[i_trajectory, step] = action
                 observations[i_trajectory, step] = next_obs
                 discrete_rewards[i_trajectory, step] = reward
                 done_flags[i_trajectory, step] = done
