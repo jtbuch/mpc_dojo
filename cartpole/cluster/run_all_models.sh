@@ -18,8 +18,8 @@ declare -a action_noises=(0.0) #0.1
 declare -a obs_mus=(0.0 0.2)
 declare -a action_mus=(0.0) #0.1
 declare -a control_models=("predictive")
-declare -a values=("env")
-declare -a rl_models=("50k") # "300k" "500k" "1000k" "2000k"
+declare -a values=("rl")
+declare -a rl_models=("50k" "300k" "500k" "1000k" "2000k") # "300k" "500k" "1000k" "2000k"
 
 
 # Loop over all parameters
@@ -30,6 +30,7 @@ for interval in "${intervals[@]}"; do
                 for obs_mu in "${obs_mus[@]}"; do
                     for action_mu in "${action_mus[@]}"; do
                         for control_model in "${control_models[@]}"; do
+                            for value in "${values[@]}"; do
                                 for rl_model in "${rl_models[@]}"; do
                                     # Submit job with specific parameters
                                     sbatch \
