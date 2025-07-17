@@ -26,9 +26,8 @@ class MPCShittyBird:
         self.rl_model = rl_model  # Name of the RL model to use, if applicable
         self.value = value  # 'env' or 'rl' to use MuJoCo env or RL model
         
-        if self.value == 'rl':
-            # If using RL, we need to initialize the model
-            model_files = {
+        # If using RL, we need to initialize the model
+        model_files = {
                 '10k': "../rl_models/td3_invertedpendulum_continuous_10k_steps",
                 '50k': "../rl_models/td3_invertedpendulum_continuous_50k_steps", 
                 '100k': "../rl_models/td3_invertedpendulum_continuous_100k_steps",
@@ -36,17 +35,17 @@ class MPCShittyBird:
                 '500k': "../rl_models/td3_invertedpendulum_continuous_500k_steps",
                 '1000k': "../rl_models/td3_invertedpendulum_continuous_1000k_steps",
                 '2000k': "../rl_models/td3_invertedpendulum_continuous_2000k_steps",
-            }
+        }
             
-            # Remove the for loop and directly check the model name
-            if self.rl_model in model_files:
-                try:
-                    self.model = TD3.load(model_files[self.rl_model])
-                    print(f"✓ Loaded {self.rl_model} model")
-                except Exception as e:
-                    print(f"✗ Failed to load {self.rl_model} model: {e}")
-            else:
-                print(f"✗ Unknown model name: {self.rl_model}. Available: {list(model_files.keys())}")
+        # Remove the for loop and directly check the model name
+        if self.rl_model in model_files:
+            try:
+                self.model = TD3.load(model_files[self.rl_model])
+                print(f"✓ Loaded {self.rl_model} model")
+            except Exception as e:
+                print(f"✗ Failed to load {self.rl_model} model: {e}")
+        else:
+            print(f"✗ Unknown model name: {self.rl_model}. Available: {list(model_files.keys())}")
   
     def restore_state(self, env, qpos, qvel):
         # Restore the environment's state
@@ -137,9 +136,9 @@ class MPCShittyBird:
         - 'random': Random Shooting (uniform random sampling)
         - 'predictive': Predictive Sampling (persistent nominal trajectory with noise)
         """
-        # Initialize persistent nominal trajectory if using Predictive Sampling or RL
-        if not hasattr(self, 'nominal_trajectory') and self.control_model in ['predictive', 'rl']:
-            self.nominal_trajectory = np.zeros([self.n_planning, *env.action_space.shape])
+        # Initialize persistent nominal trajectory using the optimal actions from the RL model
+        if not hasattr(self, 'nominal_trajectory'):
+            self.nominal_trajectory = np.array([self.model.predict(obs, deterministic=True)[0] for _ in range(self.n_planning)])
         
         # Save environment state 
         saved_qpos = env.unwrapped.data.qpos.copy()
@@ -154,25 +153,26 @@ class MPCShittyBird:
 
         # Generate candidate trajectories based on the control method
 
-        # ----------------------------------------------------------------------------------------------
-        # Predictive sampling starting from the RL deterministic policy
-        # ----------------------------------------------------------------------------------------------
-        if self.control_model == 'rl':
-            # If using RL, we need to get the action from the learned policy
-            actions[0] = np.array([self.model.predict(obs, deterministic=True)[0] for _ in range(self.n_planning)])
-            self.nominal_trajectory = actions[0]
-            # Generate noisy variations for other candidates
-            if self.planning_width > 1:
-                noise_std = 0.1 * (env.action_space.high - env.action_space.low)
-                for i in range(1, self.planning_width):
-                    noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
-                    actions[i] = self.nominal_trajectory + noise
-                    actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
+        # # ----------------------------------------------------------------------------------------------
+        # # Predictive sampling starting from the RL deterministic policy
+        # # ----------------------------------------------------------------------------------------------
+        # if self.control_model == 'rl':
+        #     # If using RL, we need to get the action from the learned policy
+        #     actions[0] = np.array([self.model.predict(obs, deterministic=True)[0] for _ in range(self.n_planning)])
+        #     self.nominal_trajectory = actions[0]
+        #     # Generate noisy variations for other candidates
+        #     if self.planning_width > 1:
+        #         noise_std = 0.1 * (env.action_space.high - env.action_space.low)
+        #         for i in range(1, self.planning_width):
+        #             noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
+        #             actions[i] = self.nominal_trajectory + noise
+        #             actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
 
         # ----------------------------------------------------------------------------------------------
         # Predictive sampling starting from zeros (Algorithm 4 in: Howell, T., Gileadi, N., Tunyasuvunakool, S., Zakka, K., Erez, T., & Tassa, Y. (2022). Predictive sampling: Real-time behaviour synthesis with mujoco. arXiv preprint arXiv:2212.00541.)
         # ----------------------------------------------------------------------------------------------
-        elif self.control_model == 'predictive':
+        if self.control_model in ['predictive', 'rl']:
+        
             # Shift previous best trajectory forward
             if self.n_planning > 1:
                 self.nominal_trajectory = np.vstack([
