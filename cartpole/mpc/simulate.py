@@ -355,16 +355,21 @@ def plot_results(results_with_stats, termination_with_stats, config):
     handles1, labels1 = axs[0].get_legend_handles_labels()
     handles2, labels2 = axs[1].get_legend_handles_labels()
     
-    # Combine and deduplicate (keeping order)
-    combined_labels = []
+    # Create ordered legend based on rl_models config order
     combined_handles = []
-    seen_labels = set()
+    combined_labels = []
     
+    # Create a mapping from labels to handles for both plots
+    label_to_handle = {}
     for handle, label in zip(handles1 + handles2, labels1 + labels2):
-        if label not in seen_labels:
-            combined_handles.append(handle)
-            combined_labels.append(label)
-            seen_labels.add(label)
+        if label not in label_to_handle:
+            label_to_handle[label] = handle
+    
+    # Add handles and labels in the order specified in config
+    for rl_model in rl_models:
+        if rl_model in label_to_handle:
+            combined_handles.append(label_to_handle[rl_model])
+            combined_labels.append(rl_model)
     
     # Add the legend at the bottom
     fig.legend(combined_handles, combined_labels, 
