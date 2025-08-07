@@ -151,29 +151,12 @@ class MPCShittyBird:
         done_flags = np.zeros([self.planning_width, self.n_planning], dtype=bool)
         cumulative_reward = np.zeros([self.planning_width])
 
-        # Generate candidate trajectories based on the control method
-
-        # # ----------------------------------------------------------------------------------------------
-        # # Predictive sampling starting from the RL deterministic policy
-        # # ----------------------------------------------------------------------------------------------
-        # if self.control_model == 'rl':
-        #     # If using RL, we need to get the action from the learned policy
-        #     actions[0] = np.array([self.model.predict(obs, deterministic=True)[0] for _ in range(self.n_planning)])
-        #     self.nominal_trajectory = actions[0]
-        #     # Generate noisy variations for other candidates
-        #     if self.planning_width > 1:
-        #         noise_std = 0.1 * (env.action_space.high - env.action_space.low)
-        #         for i in range(1, self.planning_width):
-        #             noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
-        #             actions[i] = self.nominal_trajectory + noise
-        #             actions[i] = np.clip(actions[i], env.action_space.low, env.action_space.high)
-
         # ----------------------------------------------------------------------------------------------
-        # Predictive sampling starting from zeros (Algorithm 4 in: Howell, T., Gileadi, N., Tunyasuvunakool, S., Zakka, K., Erez, T., & Tassa, Y. (2022). Predictive sampling: Real-time behaviour synthesis with mujoco. arXiv preprint arXiv:2212.00541.)
+        # Predictive sampling algorithm (Algorithm 4 in: Howell, T., Gileadi, N., Tunyasuvunakool, S., Zakka, K., Erez, T., & Tassa, Y. (2022). Predictive sampling: Real-time behaviour synthesis with mujoco. arXiv preprint arXiv:2212.00541.)
         # ----------------------------------------------------------------------------------------------
         if self.control_model in ['predictive', 'rl']:
         
-            # Shift previous best trajectory forward
+            # Shift previous best trajectory forward if doing MPC
             if self.n_planning > 1:
                 self.nominal_trajectory = np.vstack([
                     self.nominal_trajectory[1:],
@@ -183,7 +166,7 @@ class MPCShittyBird:
             # First candidate is the nominal trajectory
             actions[0] = self.nominal_trajectory
             
-            # Generate noisy variations for other candidates
+            # Generate noisy variations for other candidates if doing MPC
             if self.planning_width > 1:
                 noise_std = 0.1 * (env.action_space.high - env.action_space.low)
                 for i in range(1, self.planning_width):
@@ -201,6 +184,7 @@ class MPCShittyBird:
                 low=low, high=high,
                 size=(self.planning_width, self.n_planning) + np.shape(low)
             )
+            
 
         # ----------------------------------------------------------------------------------------------
         # Evaluate all trajectories
