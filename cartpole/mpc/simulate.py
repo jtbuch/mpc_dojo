@@ -275,12 +275,20 @@ def plot_results(results_with_stats, termination_with_stats, config):
     else:
         rl_models = list(results_with_stats.keys())
     
+    # Convert to numeric values for proper ordering
+    def extract_numeric_value(model_str):
+        """Extract numeric value from strings like '50k', '500k', etc."""
+        return int(model_str.replace('k', ''))
+    
+    # Sort rl_models by numeric value
+    rl_models_sorted = sorted(rl_models, key=extract_numeric_value)
+    
     # Use viridis colormap for nicer colors
-    colors = plt.cm.viridis(np.linspace(0, 1, len(rl_models)))
-    color_map = dict(zip(rl_models, colors))
+    colors = plt.cm.viridis(np.linspace(0, 1, len(rl_models_sorted)))
+    color_map = dict(zip(rl_models_sorted, colors))
     
     # Plot 1: Average Reward
-    for rl_model in rl_models:  # Use ordered list
+    for rl_model in rl_models_sorted:  # Use sorted list
         if rl_model not in results_with_stats:
             continue
         model_results = results_with_stats[rl_model]
@@ -307,7 +315,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].grid(True)
     
     # Plot 2: Termination Step
-    for rl_model in rl_models:  # Use ordered list
+    for rl_model in rl_models_sorted:  # Use sorted list
         if rl_model not in termination_with_stats:
             continue
         model_results = termination_with_stats[rl_model]
@@ -340,12 +348,12 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].legend().remove() if axs[0].get_legend() else None
     axs[1].legend().remove() if axs[1].get_legend() else None
     
-    # Create legend in the order specified by config
+    # Create legend in the numerically sorted order
     legend_handles = []
     legend_labels = []
     
-    # For each RL model in config order, create a representative handle
-    for rl_model in rl_models:
+    # For each RL model in sorted order, create a representative handle
+    for rl_model in rl_models_sorted:
         if rl_model in results_with_stats or rl_model in termination_with_stats:
             # Create a simple line with the model's color for the legend
             import matplotlib.lines as mlines
@@ -362,7 +370,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
               ncol=min(len(legend_labels), 4))
     
     # Update title to show multiple RL models if applicable
-    rl_models_str = ', '.join(rl_models) if len(rl_models) <= 3 else f"{len(rl_models)} RL models"
+    rl_models_str = ', '.join(rl_models_sorted) if len(rl_models_sorted) <= 3 else f"{len(rl_models_sorted)} RL models"
     
     title = (
         f'Reward and Termination Step across Planning & Recompute Intervals\n'
