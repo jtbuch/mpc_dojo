@@ -211,11 +211,11 @@ class MPCShittyBird:
 
             for step in range(self.n_planning):
 
-                if self.planning_width <2:
+                if self.n_planning <2:
                     # If using only RL and no planning, we need to get the action from the learned policy
                     action = self.model.predict(current_obs, deterministic=True)[0]
                     next_obs, reward, done, truncated, info = env.step(action)
-                elif self.planning_width >1:
+                elif self.n_planning >1:
                     # Otherwise, use the sampled action
                     action = actions[i_trajectory, step]
                     next_obs, reward, done, truncated, info = env.step(action) 
