@@ -269,13 +269,21 @@ def plot_results(results_with_stats, termination_with_stats, config):
     """Plot the results with support for multiple RL models."""
     fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharex=True)
     
-    # Define color maps for different RL models
-    rl_models = list(results_with_stats.keys())
-    colors = plt.cm.tab10(np.linspace(0, 1, len(rl_models)))
+    # Get RL models in the order they appear in config
+    if 'rl_models' in config:
+        rl_models = config['rl_models']
+    else:
+        rl_models = list(results_with_stats.keys())
+    
+    # Use viridis colormap for nicer colors
+    colors = plt.cm.viridis(np.linspace(0, 1, len(rl_models)))
     color_map = dict(zip(rl_models, colors))
     
     # Plot 1: Average Reward
-    for rl_model, model_results in results_with_stats.items():
+    for rl_model in rl_models:  # Use ordered list
+        if rl_model not in results_with_stats:
+            continue
+        model_results = results_with_stats[rl_model]
         base_color = color_map[rl_model]
         
         for i, (interval, stats_dict) in enumerate(model_results.items()):
@@ -303,12 +311,11 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].set_xlim(0, 100)
     axs[0].grid(True)
     
-    # Add legend with title for plot 1
-    legend1 = axs[0].legend(title='RL Training', title_fontsize=10)
-    legend1.get_title().set_fontweight('bold')
-    
     # Plot 2: Termination Step
-    for rl_model, model_results in termination_with_stats.items():
+    for rl_model in rl_models:  # Use ordered list
+        if rl_model not in termination_with_stats:
+            continue
+        model_results = termination_with_stats[rl_model]
         base_color = color_map[rl_model]
         
         for i, (interval, stats_dict) in enumerate(model_results.items()):
@@ -321,7 +328,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
             x_jittered = x + jitter
             
             # Create label combining RL model and interval
-            label = f'{rl_model}'  # Fixed the missing (Int {interval}) part
+            label = f'{rl_model}'
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
@@ -331,15 +338,39 @@ def plot_results(results_with_stats, termination_with_stats, config):
     
     axs[1].set_title('Termination Step')
     axs[1].set_xlabel('n_planning')
-    axs[1].set_ylabel('Step where |angle| > 1.5 (± SEM)')
+    axs[1].set_ylabel('Step where |angle| < 1.5 (± SEM)')
     axs[1].set_ylim(0, config['time_steps'] + 5)
     axs[1].set_xlim(0, 100)
     axs[1].grid(True)
-    axs[1].axhline(y=config['time_steps'], color='r', linestyle='--', label='Max Time Steps')
     
-    # Add legend with title for plot 2
-    legend2 = axs[1].legend(title='RL Training', title_fontsize=10)
-    legend2.get_title().set_fontweight('bold')
+    # Add max time steps line (without label to exclude from legend)
+    axs[1].axhline(y=config['time_steps'], color='r', linestyle='--')
+    
+    # Remove individual legends from subplots
+    axs[0].legend().remove() if axs[0].get_legend() else None
+    axs[1].legend().remove() if axs[1].get_legend() else None
+    
+    # Create a single legend at the bottom for the whole plot
+    # Get handles and labels from both plots
+    handles1, labels1 = axs[0].get_legend_handles_labels()
+    handles2, labels2 = axs[1].get_legend_handles_labels()
+    
+    # Combine and deduplicate (keeping order)
+    combined_labels = []
+    combined_handles = []
+    seen_labels = set()
+    
+    for handle, label in zip(handles1 + handles2, labels1 + labels2):
+        if label not in seen_labels:
+            combined_handles.append(handle)
+            combined_labels.append(label)
+            seen_labels.add(label)
+    
+    # Add the legend at the bottom
+    fig.legend(combined_handles, combined_labels, 
+              title='RL Training', title_fontsize=10,
+              loc='lower center', bbox_to_anchor=(0.5, -0.05),
+              ncol=min(len(combined_labels), 4))
     
     # Update title to show multiple RL models if applicable
     rl_models_str = ', '.join(rl_models) if len(rl_models) <= 3 else f"{len(rl_models)} RL models"
@@ -354,7 +385,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     )
 
     plt.suptitle(title, fontsize=12)
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])  # Adjusted to make room for bottom legend
     return fig
 
 def run_simulations(config):
