@@ -321,7 +321,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
             x_jittered = x + jitter
             
             # Create label combining RL model and interval
-            label = f'{rl_model} (Int {interval})'  # Fixed the missing (Int {interval}) part
+            label = f'{rl_model}'  # Fixed the missing (Int {interval}) part
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
