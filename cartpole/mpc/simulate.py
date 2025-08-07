@@ -288,7 +288,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
             x_jittered = x + jitter
             
             # Create label combining RL model and interval
-            label = f'{rl_model} (Int {interval})'
+            label = f'{rl_model}'
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
@@ -302,7 +302,10 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].set_ylim(-2, 0.1)
     axs[0].set_xlim(0, 100)
     axs[0].grid(True)
-    axs[0].legend()
+    
+    # Add legend with title for plot 1
+    legend1 = axs[0].legend(title='RL Training', title_fontsize=10)
+    legend1.get_title().set_fontweight('bold')
     
     # Plot 2: Termination Step
     for rl_model, model_results in termination_with_stats.items():
@@ -318,7 +321,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
             x_jittered = x + jitter
             
             # Create label combining RL model and interval
-            label = f'{rl_model} (Int {interval})'
+            label = f'{rl_model} (Int {interval})'  # Fixed the missing (Int {interval}) part
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
@@ -332,8 +335,11 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[1].set_ylim(0, config['time_steps'] + 5)
     axs[1].set_xlim(0, 100)
     axs[1].grid(True)
-    axs[1].legend()
     axs[1].axhline(y=config['time_steps'], color='r', linestyle='--', label='Max Time Steps')
+    
+    # Add legend with title for plot 2
+    legend2 = axs[1].legend(title='RL Training', title_fontsize=10)
+    legend2.get_title().set_fontweight('bold')
     
     # Update title to show multiple RL models if applicable
     rl_models_str = ', '.join(rl_models) if len(rl_models) <= 3 else f"{len(rl_models)} RL models"
