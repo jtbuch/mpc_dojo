@@ -291,17 +291,12 @@ def plot_results(results_with_stats, termination_with_stats, config):
             y = np.array(stats_dict["means"])
             yerr = np.array(stats_dict["std_errors"])
             
-            # Add jitter based on interval
-            jitter = (interval - np.mean(list(model_results.keys()))) * 0.05
-            x_jittered = x + jitter
-            
-            # Create label combining RL model and interval
             label = f'{rl_model}'
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
             
-            axs[0].errorbar(x_jittered, y, yerr=yerr, marker='o', capsize=4, 
+            axs[0].errorbar(x, y, yerr=yerr, marker='o', capsize=4, 
                           label=label, color=base_color, linestyle=linestyle, linewidth=2)
     
     axs[0].set_title('Average Reward')
@@ -323,17 +318,12 @@ def plot_results(results_with_stats, termination_with_stats, config):
             y = np.array(stats_dict["means"])
             yerr = np.array(stats_dict["std_errors"])
             
-            # Add jitter based on interval
-            jitter = (interval - np.mean(list(model_results.keys()))) * 0.05
-            x_jittered = x + jitter
-            
-            # Create label combining RL model and interval
             label = f'{rl_model}'
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
             
-            axs[1].errorbar(x_jittered, y, yerr=yerr, marker='s', capsize=4, 
+            axs[1].errorbar(x, y, yerr=yerr, marker='s', capsize=4, 
                           label=label, color=base_color, linestyle=linestyle, linewidth=2)
     
     axs[1].set_title('Termination Step')
@@ -350,32 +340,26 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].legend().remove() if axs[0].get_legend() else None
     axs[1].legend().remove() if axs[1].get_legend() else None
     
-    # Create a single legend at the bottom for the whole plot
-    # Get handles and labels from both plots
-    handles1, labels1 = axs[0].get_legend_handles_labels()
-    handles2, labels2 = axs[1].get_legend_handles_labels()
+    # Create legend in the order specified by config
+    legend_handles = []
+    legend_labels = []
     
-    # Create ordered legend based on rl_models config order
-    combined_handles = []
-    combined_labels = []
-    
-    # Create a mapping from labels to handles for both plots
-    label_to_handle = {}
-    for handle, label in zip(handles1 + handles2, labels1 + labels2):
-        if label not in label_to_handle:
-            label_to_handle[label] = handle
-    
-    # Add handles and labels in the order specified in config
+    # For each RL model in config order, create a representative handle
     for rl_model in rl_models:
-        if rl_model in label_to_handle:
-            combined_handles.append(label_to_handle[rl_model])
-            combined_labels.append(rl_model)
+        if rl_model in results_with_stats or rl_model in termination_with_stats:
+            # Create a simple line with the model's color for the legend
+            import matplotlib.lines as mlines
+            legend_handle = mlines.Line2D([], [], color=color_map[rl_model], 
+                                        marker='o', linestyle='-', linewidth=2,
+                                        markersize=6)
+            legend_handles.append(legend_handle)
+            legend_labels.append(rl_model)
     
     # Add the legend at the bottom
-    fig.legend(combined_handles, combined_labels, 
+    fig.legend(legend_handles, legend_labels, 
               title='RL Training', title_fontsize=10,
               loc='lower center', bbox_to_anchor=(0.5, -0.05),
-              ncol=min(len(combined_labels), 4))
+              ncol=min(len(legend_labels), 4))
     
     # Update title to show multiple RL models if applicable
     rl_models_str = ', '.join(rl_models) if len(rl_models) <= 3 else f"{len(rl_models)} RL models"
