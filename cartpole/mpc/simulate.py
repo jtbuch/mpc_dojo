@@ -278,7 +278,10 @@ def plot_results(results_with_stats, termination_with_stats, config):
     # Convert to numeric values for proper ordering
     def extract_numeric_value(model_str):
         """Extract numeric value from strings like '50k', '500k', etc."""
-        return int(model_str.replace('k', ''))
+        # Remove 'k' from the end and convert to numeric
+        if model_str.endswith('k'):
+            return int(model_str[:-1])  # Remove 'k' and convert to int
+        return int(model_str)  # In case there's no 'k'
     
     # Sort rl_models by numeric value
     rl_models_sorted = sorted(rl_models, key=extract_numeric_value)
@@ -286,6 +289,9 @@ def plot_results(results_with_stats, termination_with_stats, config):
     # Use viridis colormap for nicer colors
     colors = plt.cm.viridis(np.linspace(0, 1, len(rl_models_sorted)))
     color_map = dict(zip(rl_models_sorted, colors))
+    
+    # Add jitter amount
+    jitter_amount = 1.0  # Adjust this value as needed
     
     # Plot 1: Average Reward
     for rl_model in rl_models_sorted:  # Use sorted list
@@ -299,12 +305,15 @@ def plot_results(results_with_stats, termination_with_stats, config):
             y = np.array(stats_dict["means"])
             yerr = np.array(stats_dict["std_errors"])
             
+            # Add jitter to x coordinates
+            x_jittered = x + np.random.normal(0, jitter_amount, len(x))
+            
             label = f'{rl_model}'
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
             
-            axs[0].errorbar(x, y, yerr=yerr, marker='o', capsize=4, 
+            axs[0].errorbar(x_jittered, y, yerr=yerr, marker='o', capsize=4, 
                           label=label, color=base_color, linestyle=linestyle, linewidth=2)
     
     axs[0].set_title('Average Reward')
@@ -326,12 +335,15 @@ def plot_results(results_with_stats, termination_with_stats, config):
             y = np.array(stats_dict["means"])
             yerr = np.array(stats_dict["std_errors"])
             
+            # Add jitter to x coordinates
+            x_jittered = x + np.random.normal(0, jitter_amount, len(x))
+            
             label = f'{rl_model}'
             
             # Use different line styles for different intervals of the same model
             linestyle = ['-', '--', '-.', ':'][i % 4]
             
-            axs[1].errorbar(x, y, yerr=yerr, marker='s', capsize=4, 
+            axs[1].errorbar(x_jittered, y, yerr=yerr, marker='s', capsize=4, 
                           label=label, color=base_color, linestyle=linestyle, linewidth=2)
     
     axs[1].set_title('Termination Step')
