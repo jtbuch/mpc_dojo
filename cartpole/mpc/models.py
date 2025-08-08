@@ -35,6 +35,14 @@ class MPCShittyBird:
                 '500k': "../rl_models/td3_invertedpendulum_continuous_500k_steps",
                 '1000k': "../rl_models/td3_invertedpendulum_continuous_1000k_steps",
                 '2000k': "../rl_models/td3_invertedpendulum_continuous_2000k_steps",
+                '3000k': "../rl_models/td3_invertedpendulum_continuous_3000k_steps",
+                '4000k': "../rl_models/td3_invertedpendulum_continuous_4000k_steps",
+                '5000k': "../rl_models/td3_invertedpendulum_continuous_5000k_steps",
+                '6000k': "../rl_models/td3_invertedpendulum_continuous_6000k_steps",
+                '7000k': "../rl_models/td3_invertedpendulum_continuous_7000k_steps",
+                '8000k': "../rl_models/td3_invertedpendulum_continuous_8000k_steps",
+                '9000k': "../rl_models/td3_invertedpendulum_continuous_9000k_steps",
+                '10000k': "../rl_models/td3_invertedpendulum_continuous_10000k_steps"
         }
             
         # Remove the for loop and directly check the model name
@@ -184,7 +192,7 @@ class MPCShittyBird:
                 low=low, high=high,
                 size=(self.planning_width, self.n_planning) + np.shape(low)
             )
-            
+
 
         # ----------------------------------------------------------------------------------------------
         # Evaluate all trajectories
