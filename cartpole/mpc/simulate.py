@@ -349,7 +349,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[1].set_title('Termination Step')
     axs[1].set_xlabel('n_planning')
     axs[1].set_ylabel('Step where |angle| < 1.5 (± SEM)')
-    axs[1].set_ylim(-5, config['time_steps'] + 10)
+    axs[1].set_ylim(-5, 1020)
     axs[1].set_xlim(0, 100)
     axs[1].grid(True)
     
