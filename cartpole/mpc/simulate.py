@@ -320,7 +320,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].set_xlabel('n_planning')
     axs[0].set_ylabel('Avg Reward (± SEM)')
     axs[0].set_ylim(-2, 0.1)
-    axs[0].set_xlim(-1, 102)
+    axs[0].set_xlim(0, 100)
     axs[0].grid(True)
     
     # Plot 2: Termination Step
@@ -349,8 +349,8 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[1].set_title('Termination Step')
     axs[1].set_xlabel('n_planning')
     axs[1].set_ylabel('Step where |angle| < 1.5 (± SEM)')
-    axs[1].set_ylim(0, config['time_steps'] + 5)
-    axs[1].set_xlim(-5, 1010)
+    axs[1].set_ylim(-5, config['time_steps'] + 10)
+    axs[1].set_xlim(0, 100)
     axs[1].grid(True)
     
     # Add max time steps line (without label to exclude from legend)
@@ -379,7 +379,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     fig.legend(legend_handles, legend_labels, 
               title='RL Training', title_fontsize=10,
               loc='lower center', bbox_to_anchor=(0.5, -0.05),
-              ncol=min(len(legend_labels), 20))
+              ncol=min(len(legend_labels), 50))
     
     # Update title to show multiple RL models if applicable
     rl_models_str = ', '.join(rl_models_sorted) if len(rl_models_sorted) <= 3 else f"{len(rl_models_sorted)} RL models"
