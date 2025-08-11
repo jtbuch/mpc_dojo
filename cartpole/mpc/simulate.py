@@ -320,7 +320,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[0].set_xlabel('n_planning')
     axs[0].set_ylabel('Avg Reward (± SEM)')
     axs[0].set_ylim(-2, 0.1)
-    axs[0].set_xlim(0, 100)
+    axs[0].set_xlim(-1, 102)
     axs[0].grid(True)
     
     # Plot 2: Termination Step
@@ -350,7 +350,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     axs[1].set_xlabel('n_planning')
     axs[1].set_ylabel('Step where |angle| < 1.5 (± SEM)')
     axs[1].set_ylim(0, config['time_steps'] + 5)
-    axs[1].set_xlim(0, 100)
+    axs[1].set_xlim(-5, 1010)
     axs[1].grid(True)
     
     # Add max time steps line (without label to exclude from legend)
