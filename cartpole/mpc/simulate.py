@@ -379,7 +379,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
     fig.legend(legend_handles, legend_labels, 
               title='RL Training', title_fontsize=10,
               loc='lower center', bbox_to_anchor=(0.5, -0.05),
-              ncol=min(len(legend_labels), 10))
+              ncol=min(len(legend_labels), 20))
     
     # Update title to show multiple RL models if applicable
     rl_models_str = ', '.join(rl_models_sorted) if len(rl_models_sorted) <= 3 else f"{len(rl_models_sorted)} RL models"
