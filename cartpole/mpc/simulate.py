@@ -397,6 +397,138 @@ def plot_results(results_with_stats, termination_with_stats, config):
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])  # Adjusted to make room for bottom legend
     return fig
 
+def plot_rl_models(results_with_stats, termination_with_stats, config):
+    """Plot bar plots comparing RL models (n_planning=1 only)."""
+    fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+    
+    # Get RL models in the order they appear in config
+    if 'rl_models' in config:
+        rl_models = config['rl_models']
+    else:
+        rl_models = list(results_with_stats.keys())
+    
+    # Convert to numeric values for proper ordering
+    def extract_numeric_value(model_str):
+        """Extract numeric value from strings like '50k', '500k', etc."""
+        if model_str.endswith('k'):
+            return int(model_str[:-1])
+        return int(model_str)
+    
+    # Sort rl_models by numeric value
+    rl_models_sorted = sorted(rl_models, key=extract_numeric_value)
+    
+    # Use viridis colormap for nicer colors
+    colors = plt.cm.viridis(np.linspace(0, 1, len(rl_models_sorted)))
+    color_map = dict(zip(rl_models_sorted, colors))
+    
+    # Extract data for n_planning=1 only
+    reward_data = []
+    reward_errors = []
+    termination_data = []
+    termination_errors = []
+    model_labels = []
+    
+    for rl_model in rl_models_sorted:
+        # Find data for n_planning=1 in reward results
+        if rl_model in results_with_stats:
+            model_results = results_with_stats[rl_model]
+            for interval, stats_dict in model_results.items():
+                n_planning_values = np.array(stats_dict["n_planning"])
+                # Find index where n_planning=1
+                idx = np.where(n_planning_values == 1)[0]
+                if len(idx) > 0:
+                    reward_data.append(stats_dict["means"][idx[0]])
+                    reward_errors.append(stats_dict["std_errors"][idx[0]])
+                    break
+            else:
+                # If n_planning=1 not found, skip this model
+                continue
+        else:
+            continue
+            
+        # Find data for n_planning=1 in termination results
+        if rl_model in termination_with_stats:
+            model_results = termination_with_stats[rl_model]
+            for interval, stats_dict in model_results.items():
+                n_planning_values = np.array(stats_dict["n_planning"])
+                # Find index where n_planning=1
+                idx = np.where(n_planning_values == 1)[0]
+                if len(idx) > 0:
+                    termination_data.append(stats_dict["means"][idx[0]])
+                    termination_errors.append(stats_dict["std_errors"][idx[0]])
+                    break
+            else:
+                # If we added reward data but can't find termination data, remove the reward data
+                reward_data.pop()
+                reward_errors.pop()
+                continue
+        else:
+            # If we added reward data but no termination data exists, remove the reward data
+            reward_data.pop()
+            reward_errors.pop()
+            continue
+            
+        model_labels.append(rl_model)
+    
+    # Create bar positions
+    x_pos = np.arange(len(model_labels))
+    
+    # Plot 1: Average Reward Bar Plot
+    bars1 = axs[0].bar(x_pos, reward_data, yerr=reward_errors, 
+                       color=[color_map[model] for model in model_labels],
+                       capsize=4, alpha=0.8, edgecolor='black', linewidth=1)
+    
+    axs[0].set_title('Average Reward (RL Models, n_planning=1)', fontsize=14, fontweight='bold')
+    axs[0].set_ylabel('Avg Reward (± SEM)', fontsize=12)
+    axs[0].set_xticks(x_pos)
+    axs[0].set_xticklabels(model_labels, rotation=45, ha='right')
+    axs[0].grid(True, alpha=0.3)
+    axs[0].set_ylim(min(reward_data) - max(reward_errors) - 0.1, 
+                    max(reward_data) + max(reward_errors) + 0.1)
+    
+    # Plot 2: Termination Step Bar Plot
+    bars2 = axs[1].bar(x_pos, termination_data, yerr=termination_errors,
+                       color=[color_map[model] for model in model_labels],
+                       capsize=4, alpha=0.8, edgecolor='black', linewidth=1)
+    
+    axs[1].set_title('Termination Step (RL Models, n_planning=1)', fontsize=14, fontweight='bold')
+    axs[1].set_xlabel('RL Models', fontsize=12)
+    axs[1].set_ylabel('Step where |angle| < 1.5 (± SEM)', fontsize=12)
+    axs[1].set_xticks(x_pos)
+    axs[1].set_xticklabels(model_labels, rotation=45, ha='right')
+    axs[1].grid(True, alpha=0.3)
+    
+    # Add max time steps line
+    axs[1].axhline(y=config['time_steps'], color='r', linestyle='--', 
+                   linewidth=2, label=f'Max timesteps ({config["time_steps"]})')
+    axs[1].legend()
+    
+    # Add value labels on top of bars
+    for i, (bar1, bar2) in enumerate(zip(bars1, bars2)):
+        # Reward values on top of bars
+        height1 = bar1.get_height()
+        axs[0].text(bar1.get_x() + bar1.get_width()/2., height1 + reward_errors[i],
+                   f'{reward_data[i]:.3f}', ha='center', va='bottom', fontsize=9)
+        
+        # Termination values on top of bars
+        height2 = bar2.get_height()
+        axs[1].text(bar2.get_x() + bar2.get_width()/2., height2 + termination_errors[i],
+                   f'{termination_data[i]:.0f}', ha='center', va='bottom', fontsize=9)
+    
+    # Create overall title
+    title = (
+        f'RL Models Comparison (Pure RL: n_planning=1)\n'
+        f'Obs Noise: μ={config["obs_noise_mu"]}, σ={config["obs_noise_sigma"]} | '
+        f'Act Noise: μ={config["act_noise_mu"]}, σ={config["act_noise_sigma"]}\n'
+        f'Action Cost={config["action_cost"]} | Control Model={config["control_model"]} | '
+        f'Episodes={config["n_episodes"]} | Timesteps={config["time_steps"]}'
+    )
+    
+    plt.suptitle(title, fontsize=11, y=0.98)
+    plt.tight_layout(rect=[0, 0.02, 1, 0.92])
+    
+    return fig
+
 def run_simulations(config):
     """
     Run simulations based on the given configuration.
