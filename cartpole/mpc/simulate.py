@@ -267,7 +267,7 @@ def compute_stats(results_list):
 
 def plot_results(results_with_stats, termination_with_stats, config):
     """Plot the results with support for multiple RL models."""
-    fig, axs = plt.subplots(2, 1, figsize=(8, 10), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(6, 10), sharex=True)
     
     # Get RL models in the order they appear in config
     if 'rl_models' in config:
