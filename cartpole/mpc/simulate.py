@@ -606,7 +606,8 @@ def analyze_and_plot_results(config=None, timestamp=None):
         timestamp: Optional timestamp for naming output files (if None, generate a new one)
         
     Returns:
-        fig: The matplotlib figure object
+        fig_main: The main matplotlib figure object (original plot)
+        fig_rl: The RL models comparison figure object (new barplot)
         results_with_stats: Statistics for reward data
         termination_with_stats: Statistics for termination data
     """
@@ -624,7 +625,7 @@ def analyze_and_plot_results(config=None, timestamp=None):
     
     if not results_list:
         print("No model results found in the models directory.")
-        return None, None, None
+        return None, None, None, None
 
     # Initialize filter criteria and custom plotting config
     filter_criteria = {}
@@ -661,7 +662,7 @@ def analyze_and_plot_results(config=None, timestamp=None):
 
     if not filtered_results:
         print("No model results found with the specified configuration.")
-        return None, None, None
+        return None, None, None, None
 
     # Extract configuration from the first filtered model result
     config_for_plotting = filtered_results[0]['config'].copy()
@@ -669,10 +670,15 @@ def analyze_and_plot_results(config=None, timestamp=None):
     # Update plotting configuration parameters if not overridden
     config_for_plotting.update(custom_plotting_config)
     
+    # Add rl_models list to config_for_plotting if it was provided
+    if rl_models_filter is not None:
+        config_for_plotting['rl_models'] = rl_models_filter
+    
     # Compute statistics
     results_with_stats, termination_with_stats = compute_stats(filtered_results)
     
-    # Plot results
-    fig = plot_results(results_with_stats, termination_with_stats, config_for_plotting)
+    # Create both plots
+    fig_main = plot_results(results_with_stats, termination_with_stats, config_for_plotting)
+    fig_rl = plot_rl_models(results_with_stats, termination_with_stats, config_for_plotting)
     
-    return fig, results_with_stats, termination_with_stats
+    return fig_main, fig_rl, results_with_stats, termination_with_stats
