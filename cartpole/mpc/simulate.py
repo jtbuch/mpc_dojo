@@ -483,8 +483,8 @@ def plot_rl_models(results_with_stats, termination_with_stats, config):
     axs[0].set_xticks(x_pos)
     axs[0].set_xticklabels(model_labels, rotation=45, ha='right')
     axs[0].grid(True, alpha=0.3)
-    axs[0].set_ylim(min(reward_data) - max(reward_errors) - 0.1, 
-                    max(reward_data) + max(reward_errors) + 0.1)
+    # Fixed y-axis limits to match original plot
+    axs[0].set_ylim(-2, 0.1)
     
     # Plot 2: Termination Step Bar Plot
     bars2 = axs[1].bar(x_pos, termination_data, yerr=termination_errors,
@@ -497,6 +497,8 @@ def plot_rl_models(results_with_stats, termination_with_stats, config):
     axs[1].set_xticks(x_pos)
     axs[1].set_xticklabels(model_labels, rotation=45, ha='right')
     axs[1].grid(True, alpha=0.3)
+    # Fixed y-axis limits to match original plot
+    axs[1].set_ylim(-50, 1050)
     
     # Add max time steps line
     axs[1].axhline(y=config['time_steps'], color='r', linestyle='--', 
