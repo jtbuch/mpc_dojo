@@ -684,3 +684,198 @@ def analyze_and_plot_results(config=None, timestamp=None):
     fig_rl = plot_rl_models(results_with_stats, termination_with_stats, config_for_plotting)
     
     return fig_main, fig_rl, results_with_stats, termination_with_stats
+
+
+
+
+def analyze_and_plot_noise_levels(config=None, timestamp=None):
+    """
+    Load simulation results and create plots comparing different noise levels.
+    
+    Args:
+        config: Dictionary that should include:
+            - 'obs_noise_mu': np.array of noise mu values for different noise levels
+            - 'obs_noise_sigma': np.array of noise sigma values for different noise levels
+            - 'act_noise_mu': np.array of action noise mu values
+            - 'act_noise_sigma': np.array of action noise sigma values
+            - 'rl_models': list of RL models to include
+            - other filtering criteria
+        timestamp: Optional timestamp for naming output files
+        
+    Returns:
+        fig: The matplotlib figure object
+        all_results_with_stats: Dictionary containing statistics for all noise levels
+        all_termination_with_stats: Dictionary containing termination statistics for all noise levels
+    """
+    # Setup directory paths
+    results_dir = os.path.join('..', 'results')
+    models_dir = os.path.join(results_dir, 'models')
+    ensure_dir_exists(results_dir)
+    
+    # Create timestamp if not provided
+    if timestamp is None:
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+    
+    # Load all model results from the models directory
+    results_list = load_models_data(models_dir)
+    
+    if not results_list:
+        print("No model results found in the models directory.")
+        return None, None, None
+
+    # Extract noise levels from config
+    obs_noise_mu_levels = config.get('obs_noise_mu', np.array([0.0]))
+    obs_noise_sigma_levels = config.get('obs_noise_sigma', np.array([0.0]))
+    act_noise_mu_levels = config.get('act_noise_mu', np.array([0.0]))
+    act_noise_sigma_levels = config.get('act_noise_sigma', np.array([0.0]))
+    
+    # Determine number of noise levels (assuming all arrays have same length)
+    n_noise_levels = len(obs_noise_sigma_levels)
+    
+    # Prepare filter criteria (excluding noise parameters)
+    base_filter_criteria = {}
+    rl_models_filter = None
+    custom_plotting_config = {}
+    
+    if config is not None:
+        for key, value in config.items():
+            if key == 'rl_models':
+                rl_models_filter = value
+            elif key in ['control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:
+                base_filter_criteria[key] = value
+            elif key not in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma']:
+                custom_plotting_config[key] = value
+
+    # Store results for each noise level
+    all_results_with_stats = {}
+    all_termination_with_stats = {}
+    
+    # Process each noise level
+    for i in range(n_noise_levels):
+        # Create noise-specific filter criteria
+        noise_filter_criteria = base_filter_criteria.copy()
+        noise_filter_criteria['obs_noise_mu'] = np.array([obs_noise_mu_levels[i]] * 4) if len(obs_noise_mu_levels) > i else obs_noise_mu_levels
+        noise_filter_criteria['obs_noise_sigma'] = np.array([obs_noise_sigma_levels[i]] * 4) if len(obs_noise_sigma_levels) > i else obs_noise_sigma_levels
+        noise_filter_criteria['act_noise_mu'] = act_noise_mu_levels
+        noise_filter_criteria['act_noise_sigma'] = act_noise_sigma_levels
+        
+        # Filter results for this noise level
+        filtered_results = []
+        for result in results_list:
+            match = True
+            
+            # Check filter criteria
+            for key, value in noise_filter_criteria.items():
+                if not np.array_equal(result['config'][key], value):
+                    match = False
+                    break
+            
+            # Check RL model filter
+            if match and rl_models_filter is not None:
+                if result['config']['rl_model'] not in rl_models_filter:
+                    match = False
+            
+            if match:
+                filtered_results.append(result)
+        
+        if filtered_results:
+            # Compute statistics for this noise level
+            results_with_stats, termination_with_stats = compute_stats(filtered_results)
+            noise_label = f"σ={obs_noise_sigma_levels[i]:.1f}"
+            all_results_with_stats[noise_label] = results_with_stats
+            all_termination_with_stats[noise_label] = termination_with_stats
+        else:
+            print(f"No results found for noise level {i} (σ={obs_noise_sigma_levels[i]:.1f})")
+    
+    if not all_results_with_stats:
+        print("No results found for any noise level.")
+        return None, None, None
+    
+    # Create the plot
+    fig = plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config)
+    
+    return fig, all_results_with_stats, all_termination_with_stats
+
+
+def plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config):
+    """
+    Create plots comparing different noise levels.
+    
+    Args:
+        all_results_with_stats: Dictionary with noise levels as keys and results stats as values
+        all_termination_with_stats: Dictionary with noise levels as keys and termination stats as values
+        config: Configuration dictionary
+        
+    Returns:
+        fig: matplotlib figure object
+    """
+    # Create figure with subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Define colors for different noise levels
+    colors = plt.cm.tab10(np.linspace(0, 1, len(all_results_with_stats)))
+    
+    # Plot average rewards
+    for i, (noise_label, results_with_stats) in enumerate(all_results_with_stats.items()):
+        # Extract planning horizons and rewards
+        planning_horizons = []
+        mean_rewards = []
+        std_rewards = []
+        
+        for key, stats in results_with_stats.items():
+            if isinstance(key, tuple) and len(key) >= 2:
+                planning_horizon = key[1]  # Assuming planning_width is the second element
+                planning_horizons.append(planning_horizon)
+                mean_rewards.append(stats['mean'])
+                std_rewards.append(stats['std'])
+        
+        # Sort by planning horizon
+        if planning_horizons:
+            sorted_indices = np.argsort(planning_horizons)
+            planning_horizons = np.array(planning_horizons)[sorted_indices]
+            mean_rewards = np.array(mean_rewards)[sorted_indices]
+            std_rewards = np.array(std_rewards)[sorted_indices]
+            
+            # Plot with error bars
+            ax1.errorbar(planning_horizons, mean_rewards, yerr=std_rewards, 
+                        color=colors[i], marker='o', label=noise_label, capsize=5)
+    
+    ax1.set_xlabel('Planning Horizon')
+    ax1.set_ylabel('Average Reward')
+    ax1.set_title('Average Reward vs Planning Horizon by Noise Level')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Plot termination steps
+    for i, (noise_label, termination_with_stats) in enumerate(all_termination_with_stats.items()):
+        # Extract planning horizons and termination steps
+        planning_horizons = []
+        mean_terminations = []
+        std_terminations = []
+        
+        for key, stats in termination_with_stats.items():
+            if isinstance(key, tuple) and len(key) >= 2:
+                planning_horizon = key[1]  # Assuming planning_width is the second element
+                planning_horizons.append(planning_horizon)
+                mean_terminations.append(stats['mean'])
+                std_terminations.append(stats['std'])
+        
+        # Sort by planning horizon
+        if planning_horizons:
+            sorted_indices = np.argsort(planning_horizons)
+            planning_horizons = np.array(planning_horizons)[sorted_indices]
+            mean_terminations = np.array(mean_terminations)[sorted_indices]
+            std_terminations = np.array(std_terminations)[sorted_indices]
+            
+            # Plot with error bars
+            ax2.errorbar(planning_horizons, mean_terminations, yerr=std_terminations,
+                        color=colors[i], marker='s', label=noise_label, capsize=5)
+    
+    ax2.set_xlabel('Planning Horizon')
+    ax2.set_ylabel('Average Termination Step')
+    ax2.set_title('Average Termination Step vs Planning Horizon by Noise Level')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    return fig
