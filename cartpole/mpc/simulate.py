@@ -685,17 +685,14 @@ def analyze_and_plot_results(config=None, timestamp=None):
     
     return fig_main, fig_rl, results_with_stats, termination_with_stats
 
-
-
-
 def analyze_and_plot_noise_levels(config=None, timestamp=None):
     """
     Load simulation results and create plots comparing different noise levels.
     
     Args:
         config: Dictionary that should include:
-            - 'obs_noise_mu': np.array of noise mu values for different noise levels
-            - 'obs_noise_sigma': np.array of noise sigma values for different noise levels
+            - 'obs_noise_sigma_levels': np.array of different noise sigma values to compare
+            - 'obs_noise_mu_levels': np.array of corresponding noise mu values 
             - 'act_noise_mu': np.array of action noise mu values
             - 'act_noise_sigma': np.array of action noise sigma values
             - 'rl_models': list of RL models to include
@@ -724,13 +721,12 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
         return None, None, None
 
     # Extract noise levels from config
-    obs_noise_mu_levels = config.get('obs_noise_mu', np.array([0.0]))
-    obs_noise_sigma_levels = config.get('obs_noise_sigma', np.array([0.0]))
-    act_noise_mu_levels = config.get('act_noise_mu', np.array([0.0]))
-    act_noise_sigma_levels = config.get('act_noise_sigma', np.array([0.0]))
+    obs_noise_sigma_levels = config.get('obs_noise_sigma_levels', np.array([0.0]))
+    obs_noise_mu_levels = config.get('obs_noise_mu_levels', np.array([0.0]))
     
-    # Determine number of noise levels (assuming all arrays have same length)
-    n_noise_levels = len(obs_noise_sigma_levels)
+    # Ensure mu and sigma arrays have same length
+    if len(obs_noise_mu_levels) != len(obs_noise_sigma_levels):
+        obs_noise_mu_levels = np.full_like(obs_noise_sigma_levels, obs_noise_mu_levels[0])
     
     # Prepare filter criteria (excluding noise parameters)
     base_filter_criteria = {}
@@ -743,7 +739,7 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
                 rl_models_filter = value
             elif key in ['control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:
                 base_filter_criteria[key] = value
-            elif key not in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma']:
+            elif key not in ['obs_noise_mu_levels', 'obs_noise_sigma_levels', 'act_noise_mu', 'act_noise_sigma']:
                 custom_plotting_config[key] = value
 
     # Store results for each noise level
@@ -751,13 +747,15 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
     all_termination_with_stats = {}
     
     # Process each noise level
-    for i in range(n_noise_levels):
+    for i, (mu_level, sigma_level) in enumerate(zip(obs_noise_mu_levels, obs_noise_sigma_levels)):
         # Create noise-specific filter criteria
         noise_filter_criteria = base_filter_criteria.copy()
-        noise_filter_criteria['obs_noise_mu'] = np.array([obs_noise_mu_levels[i]] * 4) if len(obs_noise_mu_levels) > i else obs_noise_mu_levels
-        noise_filter_criteria['obs_noise_sigma'] = np.array([obs_noise_sigma_levels[i]] * 4) if len(obs_noise_sigma_levels) > i else obs_noise_sigma_levels
-        noise_filter_criteria['act_noise_mu'] = act_noise_mu_levels
-        noise_filter_criteria['act_noise_sigma'] = act_noise_sigma_levels
+        
+        # Set the noise parameters for this level (assuming 4-element arrays as in your original config)
+        noise_filter_criteria['obs_noise_mu'] = np.array([mu_level, mu_level, mu_level*0.1, mu_level*0.1])
+        noise_filter_criteria['obs_noise_sigma'] = np.array([sigma_level, sigma_level, sigma_level*0.1, sigma_level*0.1])
+        noise_filter_criteria['act_noise_mu'] = config.get('act_noise_mu', np.array([0.0]))
+        noise_filter_criteria['act_noise_sigma'] = config.get('act_noise_sigma', np.array([0.0]))
         
         # Filter results for this noise level
         filtered_results = []
@@ -781,11 +779,11 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
         if filtered_results:
             # Compute statistics for this noise level
             results_with_stats, termination_with_stats = compute_stats(filtered_results)
-            noise_label = f"σ={obs_noise_sigma_levels[i]:.1f}"
+            noise_label = f"σ={sigma_level:.1f}"
             all_results_with_stats[noise_label] = results_with_stats
             all_termination_with_stats[noise_label] = termination_with_stats
         else:
-            print(f"No results found for noise level {i} (σ={obs_noise_sigma_levels[i]:.1f})")
+            print(f"No results found for noise level {i} (σ={sigma_level:.1f})")
     
     if not all_results_with_stats:
         print("No results found for any noise level.")
