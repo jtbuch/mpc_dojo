@@ -730,6 +730,9 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
     all_results_with_stats = {}
     all_termination_with_stats = {}
     
+    # Store a sample filtered result for config
+    sample_filtered_result = None
+    
     # Process each noise level
     for i, (mu_level, sigma_level) in enumerate(zip(obs_noise_mu_levels, obs_noise_sigma_levels)):
         # Initialize filter criteria for this noise level
@@ -769,6 +772,9 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
             
             if match:
                 filtered_results.append(result)
+                # Store the first filtered result as sample
+                if sample_filtered_result is None:
+                    sample_filtered_result = result
         
         if filtered_results:
             # Compute statistics for this noise level using the same function
@@ -784,9 +790,9 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
         print("No results found for any noise level.")
         return None, None, None
     
-    # Get config for plotting from the first result
-    if results_list:
-        config_for_plotting = results_list[0]['config'].copy()
+    # FIXED: Get config for plotting from the first FILTERED result, not first overall result
+    if sample_filtered_result:
+        config_for_plotting = sample_filtered_result['config'].copy()
         config_for_plotting.update(custom_plotting_config)
         if rl_models_filter is not None:
             config_for_plotting['rl_models'] = rl_models_filter
@@ -794,10 +800,9 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
         config_for_plotting = config
     
     # Create the plot
-    fig1 = plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config_for_plotting)
-    fig2 = plot_noise_planning_comparison(all_results_with_stats, all_termination_with_stats, config_for_plotting)
+    fig = plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config_for_plotting)
     
-    return fig1, fig2, all_results_with_stats, all_termination_with_stats
+    return fig, all_results_with_stats, all_termination_with_stats
 
 
 def plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config):
