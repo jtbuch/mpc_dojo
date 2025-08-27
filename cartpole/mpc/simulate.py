@@ -1009,6 +1009,10 @@ def plot_noise_planning_comparison(all_results_with_stats, all_termination_with_
                 for interval, stats_dict in model_results.items():
                     all_n_planning.update(stats_dict["n_planning"])
     
+    # Filter n_planning values if specified in config
+    if 'n_planning_filter' in config:
+        all_n_planning = set(config['n_planning_filter']).intersection(all_n_planning)
+    
     n_planning_sorted = sorted(list(all_n_planning))
     
     # Use viridis colormap for different n_planning values
