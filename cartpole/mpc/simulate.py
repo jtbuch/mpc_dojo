@@ -800,9 +800,10 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
         config_for_plotting = config
     
     # Create the plot
-    fig = plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config_for_plotting)
+    fig1 = plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config_for_plotting)
+    fig2 = plot_noise_planning_comparison(all_results_with_stats, all_termination_with_stats, config_for_plotting)
     
-    return fig, all_results_with_stats, all_termination_with_stats
+    return fig1, fig2, all_results_with_stats, all_termination_with_stats
 
 
 def plot_noise_comparison(all_results_with_stats, all_termination_with_stats, config):
