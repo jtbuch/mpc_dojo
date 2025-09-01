@@ -161,7 +161,7 @@ def run_simulation(interval, n_planning, config):
         bird,
         n_episodes=config['n_episodes'],
         time_steps=config['time_steps'],
-        recompute=interval,
+        recompute_interval=interval,
         obs_noise_mu=config['obs_noise_mu'],
         obs_noise_sigma=config['obs_noise_sigma'],
         act_noise_mu=config['act_noise_mu'],
