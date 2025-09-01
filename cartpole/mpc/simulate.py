@@ -22,7 +22,9 @@ def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noi
         episode_seed = 54 + epi
         rng = np.random.default_rng(episode_seed)  # One RNG per episode
 
-        env = gym.make("InvertedPendulum-v5", render_mode="rgb_array", reset_noise_scale=0.01) 
+        env = gym.make("InvertedPendulum-v5", render_mode="rgb_array", reset_noise_scale=0.01, frame_skip=1) 
+        env.unwrapped.model.opt.timestep = 0.005 # dt physics; dt for contorl is model.opt.timestep * frame_skip
+
         obs, _ = env.reset(seed=episode_seed)
 
         env.action_space.seed(episode_seed)
@@ -388,7 +390,7 @@ def plot_results(results_with_stats, termination_with_stats, config):
         f'Reward and Termination Step across Planning & Recompute Intervals\n'
         f'Obs Noise_mu={config["obs_noise_mu"]}, Obs Noise_sigma={config["obs_noise_sigma"]}\n'
         f'Act Noise_mu={config["act_noise_mu"]}, Act Noise_sigma={config["act_noise_sigma"]}\n'
-        f'Act cost={config["action_cost"]}, Control model={config["control_model"]}\n'
+        f'Act cost={config["action_cost"]}, Control model={config["control_model"]}, Recompute={config["recompute"]}\n'
         f'Plan Width={config["planning_width"]}, Episodes={config["n_episodes"]}, Timesteps={config["time_steps"]}\n'
         f'Value={config["value"]}, RL Models={rl_models_str}'
     )
@@ -523,7 +525,7 @@ def plot_rl_models(results_with_stats, termination_with_stats, config):
         f'Obs Noise: μ={config["obs_noise_mu"]}, σ={config["obs_noise_sigma"]} | '
         f'Act Noise: μ={config["act_noise_mu"]}, σ={config["act_noise_sigma"]}\n'
         f'Action Cost={config["action_cost"]} | Control Model={config["control_model"]} | '
-        f'Episodes={config["n_episodes"]} | Timesteps={config["time_steps"]}'
+        f'Episodes={config["n_episodes"]} | Timesteps={config["time_steps"]} | Recompute={config["recompute"]}'
     )
     
     plt.suptitle(title, fontsize=11, y=0.98)
@@ -581,8 +583,8 @@ def run_simulations(config):
             for n_planning in planning_values_to_run:
                 if n_planning >= interval:  # Skip invalid configuration
                     # Define model file path
-                    model_file = os.path.join(models_dir, f'model_interval{interval}_planning{n_planning}_obsnoise{current_config["obs_noise_sigma"][0]}_obsmu{current_config["obs_noise_mu"][0]}_actnoise{current_config["act_noise_sigma"][0]}_actmu{current_config["act_noise_mu"][0]}_time{timestamp}_model{current_config["control_model"]}_value{current_config["value"]}_rl_model{rl_model}.pkl')
-                    
+                    model_file = os.path.join(models_dir, f'model_interval{interval}_recompute{current_config["recompute"]}_planning{n_planning}_obsnoise{current_config["obs_noise_sigma"][0]}_obsmu{current_config["obs_noise_mu"][0]}_actnoise{current_config["act_noise_sigma"][0]}_actmu{current_config["act_noise_mu"][0]}_time{timestamp}_model{current_config["control_model"]}_value{current_config["value"]}_rl_model{rl_model}.pkl')
+
                     # Run the simulation for this configuration
                     result = run_simulation(interval, n_planning, current_config)
                     

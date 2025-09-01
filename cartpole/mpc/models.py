@@ -145,8 +145,15 @@ class MPCShittyBird:
         - 'predictive': Predictive Sampling (persistent nominal trajectory with noise)
         """
         # Initialize persistent nominal trajectory using the optimal actions from the RL model
-        if not hasattr(self, 'nominal_trajectory'):
-            self.nominal_trajectory = np.array([self.model.predict(obs, deterministic=True)[0] for _ in range(self.n_planning)])
+        if self.control_model in ['rl']:
+            if not hasattr(self, 'nominal_trajectory'):
+                self.nominal_trajectory = np.array([self.model.predict(obs, deterministic=True)[0] for _ in range(self.n_planning)])
+
+        # Initialize actions as zeros
+        elif self.control_model in ['predictive']:
+            if not hasattr(self, 'nominal_trajectory'):
+                # Randomly sample the trajectory
+                self.nominal_trajectory = np.zeros((self.n_planning, *env.action_space.shape))
         
         # Save environment state 
         saved_qpos = env.unwrapped.data.qpos.copy()
@@ -192,7 +199,6 @@ class MPCShittyBird:
                 low=low, high=high,
                 size=(self.planning_width, self.n_planning) + np.shape(low)
             )
-
 
         # ----------------------------------------------------------------------------------------------
         # Evaluate all trajectories
