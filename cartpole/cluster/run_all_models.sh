@@ -11,8 +11,8 @@
 #SBATCH -o log/R-%x.%j.out
 
 # Array of intervals and horizons
-declare -a intervals=(1 5)
-declare -a horizons=(5 10 20 30 40 50 60 70 80 90 100) #30 40 50 60 70 80 90 100
+declare -a intervals=(1 5 10)
+declare -a horizons=(10 20 30 40 50 60 70 80 90 100) #30 40 50 60 70 80 90 100
 declare -a obs_noises=(0.0 0.4)
 declare -a action_noises=(0.0) #0.1
 declare -a obs_mus=(0.0 0.4)
