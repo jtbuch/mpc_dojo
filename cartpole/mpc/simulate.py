@@ -146,7 +146,6 @@ def run_simulation(interval, n_planning, config):
     # Create agent with specified parameters
     bird = MPCShittyBird(
         n_actions=10,
-        recompute=interval,
         planning_width=config['planning_width'],
         n_planning=n_planning,
         reward_type=config['reward_type'],
@@ -162,7 +161,7 @@ def run_simulation(interval, n_planning, config):
         bird,
         n_episodes=config['n_episodes'],
         time_steps=config['time_steps'],
-        recompute_interval=config['recompute_intervals'],
+        recompute=interval,
         obs_noise_mu=config['obs_noise_mu'],
         obs_noise_sigma=config['obs_noise_sigma'],
         act_noise_mu=config['act_noise_mu'],
