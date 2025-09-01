@@ -146,7 +146,7 @@ def run_simulation(interval, n_planning, config):
     # Create agent with specified parameters
     bird = MPCShittyBird(
         n_actions=10,
-        recompute=recompute,
+        recompute=interval,
         planning_width=config['planning_width'],
         n_planning=n_planning,
         reward_type=config['reward_type'],
@@ -584,7 +584,7 @@ def run_simulations(config):
             for n_planning in planning_values_to_run:
                 if n_planning >= interval:  # Skip invalid configuration
                     # Define model file path
-                    model_file = os.path.join(models_dir, f'model_interval{interval}_recompute{current_config["recompute"]}_planning{n_planning}_obsnoise{current_config["obs_noise_sigma"][0]}_obsmu{current_config["obs_noise_mu"][0]}_actnoise{current_config["act_noise_sigma"][0]}_actmu{current_config["act_noise_mu"][0]}_time{timestamp}_model{current_config["control_model"]}_value{current_config["value"]}_rl_model{rl_model}.pkl')
+                    model_file = os.path.join(models_dir, f'model_interval{interval}_planning{n_planning}_obsnoise{current_config["obs_noise_sigma"][0]}_obsmu{current_config["obs_noise_mu"][0]}_actnoise{current_config["act_noise_sigma"][0]}_actmu{current_config["act_noise_mu"][0]}_time{timestamp}_model{current_config["control_model"]}_value{current_config["value"]}_rl_model{rl_model}.pkl')
 
                     # Run the simulation for this configuration
                     result = run_simulation(interval, n_planning, current_config)
