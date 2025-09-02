@@ -25,7 +25,6 @@ print(f"Running simulation with recompute_interval={recompute_interval}, n_plann
 config = {
     'planning_width': 200,
     'reward_type': 'continuous',
-    'recompute': 'recompute_interval',
     'obs_noise_mu': np.array([obs_mu, obs_mu, obs_mu*0.1, obs_mu*0.1]),
     'obs_noise_sigma': np.array([obs_noise, obs_noise, obs_noise*0.1, obs_noise*0.1]),
     'act_noise_mu': np.array([act_mu]),
