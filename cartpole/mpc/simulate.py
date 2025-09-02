@@ -751,7 +751,7 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
             for key, value in config.items():
                 if key == 'rl_models':
                     rl_models_filter = value
-                elif key in ['act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps', 'interval']:
+                elif key in ['act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:
                     filter_criteria[key] = value
                 elif key not in ['obs_noise_mu_levels', 'obs_noise_sigma_levels']:
                     custom_plotting_config[key] = value
@@ -1184,4 +1184,258 @@ def plot_noise_planning_comparison(all_results_with_stats, all_termination_with_
 
     plt.suptitle(title, fontsize=12)
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    return fig
+
+
+def plot_planning_vs_intervals(config=None, timestamp=None):
+    """
+    Create plots with n_planning on x-axis and recompute intervals as different colors.
+    Filters for a specific noise level and aggregates across RL models.
+    
+    Args:
+        config: Configuration dictionary that should include:
+            - 'obs_noise_mu': specific noise mu to filter for
+            - 'obs_noise_sigma': specific noise sigma to filter for
+            - 'rl_models': list of RL models to include (optional, includes all if not specified)
+            - other filtering criteria
+        timestamp: Optional timestamp for naming output files
+        
+    Returns:
+        fig: The matplotlib figure object
+        results_with_stats: Statistics for reward data
+        termination_with_stats: Statistics for termination data
+    """
+    # Setup directory paths
+    results_dir = os.path.join('..', 'results')
+    models_dir = os.path.join(results_dir, 'models')
+    ensure_dir_exists(results_dir)
+    
+    # Create timestamp if not provided
+    if timestamp is None:
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+    
+    # Load all model results from the models directory
+    results_list = load_models_data(models_dir)
+    
+    if not results_list:
+        print("No model results found in the models directory.")
+        return None, None, None
+
+    # Initialize filter criteria
+    filter_criteria = {}
+    rl_models_filter = None
+    custom_plotting_config = {}
+    
+    if config is not None:
+        for key, value in config.items():
+            if key == 'rl_models':
+                rl_models_filter = value
+            elif key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma', 
+                        'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:
+                filter_criteria[key] = value
+            else:
+                custom_plotting_config[key] = value
+
+    # Filter results based on criteria
+    filtered_results = []
+    for result in results_list:
+        match = True
+        
+        # Check standard filter criteria
+        for key, value in filter_criteria.items():
+            if not np.array_equal(result['config'][key], value):
+                match = False
+                break
+        
+        # Check RL model filter
+        if match and rl_models_filter is not None:
+            if result['config']['rl_model'] not in rl_models_filter:
+                match = False
+        
+        if match:
+            filtered_results.append(result)
+
+    if not filtered_results:
+        print("No model results found with the specified configuration.")
+        return None, None, None
+
+    # Extract configuration from the first filtered result
+    config_for_plotting = filtered_results[0]['config'].copy()
+    config_for_plotting.update(custom_plotting_config)
+    if rl_models_filter is not None:
+        config_for_plotting['rl_models'] = rl_models_filter
+    
+    # Compute statistics using existing function
+    results_with_stats, termination_with_stats = compute_stats(filtered_results)
+    
+    # Create the plot
+    fig = _plot_planning_intervals_chart(results_with_stats, termination_with_stats, config_for_plotting)
+    
+    return fig, results_with_stats, termination_with_stats
+
+
+def _plot_planning_intervals_chart(results_with_stats, termination_with_stats, config):
+    """
+    Internal function to create the actual plot with n_planning on x-axis and intervals as colors.
+    """
+    fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
+    
+    # Get all unique intervals across all RL models
+    all_intervals = set()
+    for rl_model, model_results in results_with_stats.items():
+        all_intervals.update(model_results.keys())
+    
+    intervals_sorted = sorted(list(all_intervals))
+    
+    # Use viridis colormap for different intervals
+    colors = plt.cm.viridis(np.linspace(0, 1, len(intervals_sorted)))
+    color_map = dict(zip(intervals_sorted, colors))
+    
+    # Add jitter amount
+    jitter_amount = 0.8
+    
+    # Plot 1: Average Reward
+    for interval in intervals_sorted:
+        # Collect all data points for this interval across all RL models
+        all_n_planning = []
+        all_rewards = []
+        all_reward_errors = []
+        
+        for rl_model, model_results in results_with_stats.items():
+            if interval in model_results:
+                stats_dict = model_results[interval]
+                n_planning_values = stats_dict["n_planning"]
+                means = stats_dict["means"]
+                std_errors = stats_dict["std_errors"]
+                
+                all_n_planning.extend(n_planning_values)
+                all_rewards.extend(means)
+                all_reward_errors.extend(std_errors)
+        
+        if all_n_planning:  # Only plot if we have data
+            # Convert to numpy arrays and sort by n_planning
+            n_planning_array = np.array(all_n_planning)
+            rewards_array = np.array(all_rewards)
+            errors_array = np.array(all_reward_errors)
+            
+            # Sort by n_planning values
+            sort_idx = np.argsort(n_planning_array)
+            n_planning_sorted = n_planning_array[sort_idx]
+            rewards_sorted = rewards_array[sort_idx]
+            errors_sorted = errors_array[sort_idx]
+            
+            # Add jitter to x coordinates
+            x_jittered = n_planning_sorted + np.random.normal(0, jitter_amount, len(n_planning_sorted))
+            
+            axs[0].errorbar(x_jittered, rewards_sorted, yerr=errors_sorted, 
+                          marker='o', capsize=4, label=f'Interval={interval}', 
+                          color=color_map[interval], linestyle='-', linewidth=2,
+                          markersize=6, alpha=0.8)
+    
+    axs[0].set_title('Average Reward vs Planning Steps', fontsize=14, fontweight='bold')
+    axs[0].set_ylabel('Avg Reward (± SEM)', fontsize=12)
+    axs[0].set_ylim(-2, 0.1)
+    axs[0].set_xlim(-5, 105)
+    axs[0].grid(True, alpha=0.3)
+    
+    # Plot 2: Termination Step
+    for interval in intervals_sorted:
+        # Collect all data points for this interval across all RL models
+        all_n_planning = []
+        all_terminations = []
+        all_termination_errors = []
+        
+        for rl_model, model_results in termination_with_stats.items():
+            if interval in model_results:
+                stats_dict = model_results[interval]
+                n_planning_values = stats_dict["n_planning"]
+                means = stats_dict["means"]
+                std_errors = stats_dict["std_errors"]
+                
+                all_n_planning.extend(n_planning_values)
+                all_terminations.extend(means)
+                all_termination_errors.extend(std_errors)
+        
+        if all_n_planning:  # Only plot if we have data
+            # Convert to numpy arrays and sort by n_planning
+            n_planning_array = np.array(all_n_planning)
+            terminations_array = np.array(all_terminations)
+            errors_array = np.array(all_termination_errors)
+            
+            # Sort by n_planning values
+            sort_idx = np.argsort(n_planning_array)
+            n_planning_sorted = n_planning_array[sort_idx]
+            terminations_sorted = terminations_array[sort_idx]
+            errors_sorted = errors_array[sort_idx]
+            
+            # Add jitter to x coordinates
+            x_jittered = n_planning_sorted + np.random.normal(0, jitter_amount, len(n_planning_sorted))
+            
+            axs[1].errorbar(x_jittered, terminations_sorted, yerr=errors_sorted, 
+                          marker='s', capsize=4, label=f'Interval={interval}', 
+                          color=color_map[interval], linestyle='-', linewidth=2,
+                          markersize=6, alpha=0.8)
+    
+    axs[1].set_title('Termination Step vs Planning Steps', fontsize=14, fontweight='bold')
+    axs[1].set_xlabel('n_planning', fontsize=12)
+    axs[1].set_ylabel('Step where |angle| < 1.5 (± SEM)', fontsize=12)
+    axs[1].set_ylim(-50, 1050)
+    axs[1].set_xlim(-5, 105)
+    axs[1].grid(True, alpha=0.3)
+    
+    # Add max time steps line
+    if 'time_steps' in config:
+        axs[1].axhline(y=config['time_steps'], color='r', linestyle='--', 
+                      linewidth=2, label=f'Max timesteps ({config["time_steps"]})')
+    
+    # Remove individual legends from subplots
+    axs[0].legend().remove() if axs[0].get_legend() else None
+    axs[1].legend().remove() if axs[1].get_legend() else None
+    
+    # Create shared legend for intervals
+    legend_handles = []
+    legend_labels = []
+    
+    for interval in intervals_sorted:
+        import matplotlib.lines as mlines
+        legend_handle = mlines.Line2D([], [], color=color_map[interval], 
+                                    marker='o', linestyle='-', linewidth=2,
+                                    markersize=8)
+        legend_handles.append(legend_handle)
+        legend_labels.append(f'Recompute Interval = {interval}')
+    
+    # Add max timesteps to legend if it exists
+    if 'time_steps' in config:
+        import matplotlib.lines as mlines
+        max_steps_handle = mlines.Line2D([], [], color='r', linestyle='--', linewidth=2)
+        legend_handles.append(max_steps_handle)
+        legend_labels.append(f'Max timesteps ({config["time_steps"]})')
+    
+    # Place legend at the bottom
+    fig.legend(legend_handles, legend_labels, 
+              title='Recompute Intervals', title_fontsize=12,
+              loc='lower center', bbox_to_anchor=(0.5, -0.02),
+              ncol=min(len(legend_labels), 4), fontsize=10)
+    
+    # Create comprehensive title
+    noise_mu_str = str(config.get('obs_noise_mu', 'N/A'))
+    noise_sigma_str = str(config.get('obs_noise_sigma', 'N/A'))
+    rl_models = config.get('rl_models', ['All models'])
+    rl_models_str = ', '.join(rl_models) if len(rl_models) <= 3 else f"{len(rl_models)} RL models"
+    
+    title = (
+        f'Planning Steps vs Recompute Intervals\n'
+        f'Obs Noise: μ={noise_mu_str}, σ={noise_sigma_str} | '
+        f'Act Noise: μ={config.get("act_noise_mu", "N/A")}, σ={config.get("act_noise_sigma", "N/A")}\n'
+        f'Control Model: {config.get("control_model", "N/A")} | '
+        f'Value: {config.get("value", "N/A")} | '
+        f'Action Cost: {config.get("action_cost", "N/A")}\n'
+        f'Episodes: {config.get("n_episodes", "N/A")} | '
+        f'Timesteps: {config.get("time_steps", "N/A")} | '
+        f'RL Models: {rl_models_str}'
+    )
+
+    plt.suptitle(title, fontsize=11, y=0.98)
+    plt.tight_layout(rect=[0, 0.05, 1, 0.94])
+    
     return fig
