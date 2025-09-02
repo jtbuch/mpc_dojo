@@ -1406,7 +1406,7 @@ def _plot_planning_intervals_chart(results_with_stats, termination_with_stats, c
     axs[1].set_title('Termination Step vs Planning Steps', fontsize=14, fontweight='bold')
     axs[1].set_xlabel('n_planning', fontsize=12)
     axs[1].set_ylabel('Step where |angle| < 1.5 (± SEM)', fontsize=12)
-    axs[1].set_ylim(-50, 1050)
+    axs[1].set_ylim(-50, config["time_steps"]+50)
     axs[1].set_xlim(-5, 105)
     axs[1].grid(True, alpha=0.3)
     
