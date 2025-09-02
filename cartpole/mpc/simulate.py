@@ -1193,10 +1193,11 @@ def plot_planning_vs_intervals(config=None, timestamp=None):
     Filters for a specific noise level and aggregates across RL models.
     
     Args:
-        config: Configuration dictionary that should include:
+        config: Configuration dictionary that can include:
+            - 'intervals': list of specific intervals to plot (e.g., [1, 5, 10])
             - 'obs_noise_mu': specific noise mu to filter for
             - 'obs_noise_sigma': specific noise sigma to filter for
-            - 'rl_models': list of RL models to include (optional, includes all if not specified)
+            - 'rl_models': list of RL models to include
             - other filtering criteria
         timestamp: Optional timestamp for naming output files
         
@@ -1224,12 +1225,15 @@ def plot_planning_vs_intervals(config=None, timestamp=None):
     # Initialize filter criteria
     filter_criteria = {}
     rl_models_filter = None
+    intervals_filter = None
     custom_plotting_config = {}
     
     if config is not None:
         for key, value in config.items():
             if key == 'rl_models':
                 rl_models_filter = value
+            elif key == 'intervals':
+                intervals_filter = value
             elif key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma', 
                         'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:
                 filter_criteria[key] = value
@@ -1264,9 +1268,32 @@ def plot_planning_vs_intervals(config=None, timestamp=None):
     config_for_plotting.update(custom_plotting_config)
     if rl_models_filter is not None:
         config_for_plotting['rl_models'] = rl_models_filter
+    if intervals_filter is not None:
+        config_for_plotting['intervals'] = intervals_filter
     
     # Compute statistics using existing function
     results_with_stats, termination_with_stats = compute_stats(filtered_results)
+    
+    # Filter intervals if specified
+    if intervals_filter is not None:
+        # Filter results_with_stats
+        filtered_results_with_stats = {}
+        for rl_model, model_results in results_with_stats.items():
+            filtered_model_results = {interval: stats for interval, stats in model_results.items() 
+                                    if interval in intervals_filter}
+            if filtered_model_results:  # Only add if there are results
+                filtered_results_with_stats[rl_model] = filtered_model_results
+        
+        # Filter termination_with_stats
+        filtered_termination_with_stats = {}
+        for rl_model, model_results in termination_with_stats.items():
+            filtered_model_results = {interval: stats for interval, stats in model_results.items() 
+                                    if interval in intervals_filter}
+            if filtered_model_results:  # Only add if there are results
+                filtered_termination_with_stats[rl_model] = filtered_model_results
+        
+        results_with_stats = filtered_results_with_stats
+        termination_with_stats = filtered_termination_with_stats
     
     # Create the plot
     fig = _plot_planning_intervals_chart(results_with_stats, termination_with_stats, config_for_plotting)
@@ -1278,7 +1305,7 @@ def _plot_planning_intervals_chart(results_with_stats, termination_with_stats, c
     """
     Internal function to create the actual plot with n_planning on x-axis and intervals as colors.
     """
-    fig, axs = plt.subplots(2, 1, figsize=(7, 10), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(8, 10), sharex=True)
     
     # Get all unique intervals across all RL models
     all_intervals = set()
@@ -1423,13 +1450,19 @@ def _plot_planning_intervals_chart(results_with_stats, termination_with_stats, c
     rl_models = config.get('rl_models', ['All models'])
     rl_models_str = ', '.join(rl_models) if len(rl_models) <= 3 else f"{len(rl_models)} RL models"
     
+    # Add interval info to title if filtered
+    intervals_str = ""
+    if 'intervals' in config:
+        intervals_list = config['intervals']
+        intervals_str = f" | Intervals: {intervals_list}"
+    
     title = (
         f'Planning Steps vs Recompute Intervals\n'
         f'Obs Noise: μ={noise_mu_str}, σ={noise_sigma_str} | '
         f'Act Noise: μ={config.get("act_noise_mu", "N/A")}, σ={config.get("act_noise_sigma", "N/A")}\n'
         f'Control Model: {config.get("control_model", "N/A")} | '
         f'Value: {config.get("value", "N/A")} | '
-        f'Action Cost: {config.get("action_cost", "N/A")}\n'
+        f'Action Cost: {config.get("action_cost", "N/A")}{intervals_str}\n'
         f'Episodes: {config.get("n_episodes", "N/A")} | '
         f'Timesteps: {config.get("time_steps", "N/A")} | '
         f'RL Models: {rl_models_str}'
