@@ -1278,7 +1278,7 @@ def _plot_planning_intervals_chart(results_with_stats, termination_with_stats, c
     """
     Internal function to create the actual plot with n_planning on x-axis and intervals as colors.
     """
-    fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(6, 8), sharex=True)
     
     # Get all unique intervals across all RL models
     all_intervals = set()
