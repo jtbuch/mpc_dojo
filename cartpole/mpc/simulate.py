@@ -640,7 +640,7 @@ def analyze_and_plot_results(config=None, timestamp=None):
         for key, value in config.items():
             if key == 'rl_models':
                 rl_models_filter = value  # List of RL models to include
-            elif key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:
+            elif key in ['obs_noise_mu', 'obs_noise_sigma', 'act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps','interval']:
                 filter_criteria[key] = value
             else:
                 custom_plotting_config[key] = value
@@ -981,7 +981,7 @@ def plot_noise_comparison(all_results_with_stats, all_termination_with_stats, co
     title = (
         f'Reward and Termination Step across Planning & Noise Levels\n'
         f'Act Noise_mu={config.get("act_noise_mu", "N/A")}, Act Noise_sigma={config.get("act_noise_sigma", "N/A")}\n'
-        f'Act cost={config.get("action_cost", "N/A")}, Control model={config.get("control_model", "N/A")}\n'
+        f'Act cost={config.get("action_cost", "N/A")}, Control model={config.get("control_model", "N/A")}, Recompute={config.get("recompute", "N/A")}\n'
         f'Plan Width={config.get("planning_width", "N/A")}, Episodes={config.get("n_episodes", "N/A")}, Timesteps={config.get("time_steps", "N/A")}\n'
         f'Value={config.get("value", "N/A")}, RL Models={rl_models_str}'
     )
