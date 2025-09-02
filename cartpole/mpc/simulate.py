@@ -751,7 +751,7 @@ def analyze_and_plot_noise_levels(config=None, timestamp=None):
             for key, value in config.items():
                 if key == 'rl_models':
                     rl_models_filter = value
-                elif key in ['act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps']:
+                elif key in ['act_noise_mu', 'act_noise_sigma', 'control_model', 'rl_model', 'value', 'n_episodes', 'time_steps', 'interval']:
                     filter_criteria[key] = value
                 elif key not in ['obs_noise_mu_levels', 'obs_noise_sigma_levels']:
                     custom_plotting_config[key] = value
