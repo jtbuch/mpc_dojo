@@ -45,7 +45,7 @@ mpc_results = evaluate_mpc_controllers(
         recompute_intervals=[recompute_interval],
         length_ratios=[length_ratio],
         results_folder="../results/PerformanceResults/",
-        episode_length=5,
-        num_episodes=2,
+        episode_length=2000,
+        num_episodes=50,
         linear=False,
     )
