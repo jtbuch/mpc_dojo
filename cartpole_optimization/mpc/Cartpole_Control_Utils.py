@@ -230,24 +230,36 @@ def analyze_performance_results_episode_length(results_folder="results/Performan
             # Convert recompute frequency to ms
             recompute_ms = recompute * dt * 1000
             label = f'Recompute every {recompute_ms:.0f}ms'
-            plt.errorbar(subset['length_ratio'], subset['mean_length'], yerr=subset['std_length'],
+            
+            # Convert episode lengths to milliseconds
+            mean_length_ms = subset['mean_length'] * dt * 1000
+            std_length_ms = subset['std_length'] * dt * 1000
+            
+            plt.errorbar(subset['length_ratio'], mean_length_ms, yerr=std_length_ms,
                         marker='o', label=label, capsize=3, linewidth=2, markersize=8, color=colors[i])
     
-    # Add vertical line at perfect model
-    plt.axhline(y=episode_length, color='red', linestyle='--', alpha=0.7, linewidth=2, label='Max Episode Length')
+    # Add horizontal line at max episode length (converted to ms)
+    max_episode_length_ms = episode_length * dt * 1000
+    plt.axhline(y=max_episode_length_ms, color='red', linestyle='--', alpha=0.7, linewidth=2, label='Max Episode Length')
     
     # Updated title with horizon in ms
     plt.title(f'MPC Performance: Pole Length Misspecification vs Recompute Frequency (h={horizon_ms:.0f}ms, N={num_episodes} episodes)', 
               fontsize=14, fontweight='bold')
     plt.xlabel('Model Length / True Length', fontsize=12)
-    plt.ylabel('Mean Episode Length (± SD)', fontsize=12)
+    plt.ylabel('Mean Episode Length (ms) (± SD)', fontsize=12)  # Updated y-label
     plt.legend(fontsize=10)
     plt.grid(True, alpha=0.3)
-    plt.ylim(0, episode_length+200)
+    plt.ylim(0, max_episode_length_ms + 200*dt*1000)  # Convert ylim to ms
+
+    # save the plot
+    plt.tight_layout()
+    save_path = os.path.join(results_folder, f"mpc_performance_length_ratio_h{horizon}_no_noise.png")
+    plt.savefig(save_path, bbox_inches="tight", dpi=300)
+    print(f"\nPlot saved to: {save_path}")
     
     plt.show()
     
-    return 
+    return
 
 
 def plot_4d_performance_heatmaps(results_folder="results/PerformanceResults/", 
@@ -295,11 +307,15 @@ def plot_4d_performance_heatmaps(results_folder="results/PerformanceResults/",
     recomputes = sorted(df['recompute'].unique())
     available_ratios = sorted(df['length_ratio'].unique())
     
+    # Convert to milliseconds for display
+    horizons_ms = [h * dt * 1000 for h in horizons]
+    recomputes_ms = [r * dt * 1000 for r in recomputes]
+    
     # Filter to requested ratios that exist
     plot_ratios = [r for r in length_ratios if r in available_ratios]
     
-    print(f"Found data for horizons: {horizons}")
-    print(f"Found data for recompute intervals: {recomputes}")
+    print(f"Found data for horizons: {horizons} steps = {[f'{h:.0f}ms' for h in horizons_ms]}")
+    print(f"Found data for recompute intervals: {recomputes} steps = {[f'{r:.0f}ms' for r in recomputes_ms]}")
     print(f"Plotting ratios: {plot_ratios}")
     
     # Create figure with subplots
@@ -330,16 +346,16 @@ def plot_4d_performance_heatmaps(results_folder="results/PerformanceResults/",
         im = axes[idx].imshow(perf_matrix, cmap='viridis', aspect='auto', 
                              vmin=vmin, vmax=vmax, origin='lower')
         
-        # Set ticks and labels
+        # Set ticks and labels with milliseconds
         axes[idx].set_xticks(range(len(horizons)))
-        axes[idx].set_xticklabels(horizons)
+        axes[idx].set_xticklabels([f'{h:.0f}' for h in horizons_ms])  # Show horizons in ms
         axes[idx].set_yticks(range(len(recomputes)))
-        axes[idx].set_yticklabels(recomputes)
+        axes[idx].set_yticklabels([f'{r:.0f}' for r in recomputes_ms])  # Show recomputes in ms
         
-        # Labels and title
-        axes[idx].set_xlabel('Horizon', fontsize=11)
+        # Labels and title with updated units
+        axes[idx].set_xlabel('Horizon (ms)', fontsize=11)
         if idx == 0:
-            axes[idx].set_ylabel('Recompute Every N Steps', fontsize=11)
+            axes[idx].set_ylabel('Recompute Every (ms)', fontsize=11)
         
         # Title with status
         title = f'Ratio = {ratio:.1f}'
@@ -363,8 +379,8 @@ def plot_4d_performance_heatmaps(results_folder="results/PerformanceResults/",
                                   color=text_color, fontsize=9, fontweight='bold')
     
     # Add colorbar
-    # cbar = fig.colorbar(im, ax=axes, fraction=0.046, pad=0.04, aspect=30)
-    # cbar.set_label('Mean Episode Length', fontsize=12)
+    cbar = fig.colorbar(im, ax=axes, fraction=0.046, pad=0.04, aspect=30)
+    cbar.set_label('Mean Episode Length', fontsize=12)
     
     # Overall title
     fig.suptitle(f'MPC Performance: Horizon × Recompute × Pole Length Error (N={num_episodes} episodes)', 
