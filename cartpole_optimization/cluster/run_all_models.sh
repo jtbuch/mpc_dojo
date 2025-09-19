@@ -21,8 +21,8 @@ for length_ratio in "${length_ratios[@]}"; do
                                     sbatch \
                                         --job-name="MPC_len${length_ratio}_recompute${recompute_interval}" \
                                         --account=carney-ashenhav-condo \
-                                        --time=100:00:00 \
-                                        --mem=48G \
+                                        --time=30:00:00 \
+                                        --mem=10G \
                                         --nodes=1 \
                                         -o "log/MPC_len${length_ratio}_recompute${recompute_interval}.%j.out" \
                                         run_one_model.sh "$length_ratio" "$recompute_interval"
