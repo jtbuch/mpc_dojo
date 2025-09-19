@@ -243,7 +243,7 @@ def analyze_performance_results_episode_length(results_folder="results/Performan
     plt.ylabel('Mean Episode Length (± SD)', fontsize=12)
     plt.legend(fontsize=10)
     plt.grid(True, alpha=0.3)
-    plt.ylim(0, 600)
+    plt.ylim(0, episode_length+200)
     
     plt.show()
     
