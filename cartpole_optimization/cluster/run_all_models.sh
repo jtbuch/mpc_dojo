@@ -12,16 +12,20 @@
 
 # Array of intervals and horizons
 declare -a length_ratios=(1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4 2.6 2.8 3.0)
+declare -a recompute_intervals=(1 2 3 4 5 6 7 8 9 10)
 
 # Loop over all parameters
 for length_ratio in "${length_ratios[@]}"; do
+    for recompute_interval in "${recompute_intervals[@]}"; do
                                     # Submit job with specific parameters
                                     sbatch \
-                                        --job-name="MPC_len${length_ratio}" \
+                                        --job-name="MPC_len${length_ratio}_recompute${recompute_interval}" \
                                         --account=carney-ashenhav-condo \
                                         --time=100:00:00 \
                                         --mem=48G \
                                         --nodes=1 \
-                                        -o "log/MPC_len${length_ratio}.%j.out" \
-                                        run_one_model.sh "$length_ratio"
+                                        -o "log/MPC_len${length_ratio}_recompute${recompute_interval}.%j.out" \
+                                        run_one_model.sh "$length_ratio" "$recompute_interval"
+
+                                    done
 done

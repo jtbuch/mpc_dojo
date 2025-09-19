@@ -19,8 +19,9 @@ import time
 
 # Parse command line arguments
 length_ratio = int(sys.argv[1])
+recompute_interval = int(sys.argv[2])
 
-print(f"Running simulation with length_ratio={length_ratio}")
+print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval}")
 
 # Create 'Results' folder if it doesn't exist
 models_folder = "../results/Trained_Models/"
@@ -41,7 +42,7 @@ results_records = []
 start_time = time.time()
 mpc_results = evaluate_mpc_controllers(
         horizons=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-        recompute_intervals=[1,2,3,4,5,6,7,8,9,10],
+        recompute_intervals=[recompute_interval],
         length_ratios=[length_ratio],
         results_folder="../results/PerformanceResults/",
         episode_length=5,
