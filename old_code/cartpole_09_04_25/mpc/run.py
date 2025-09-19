@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import gymnasium as gym
 import imageio
-import scipy.linalg
 
 
 # Parse command line arguments
@@ -22,11 +21,6 @@ rl_model = sys.argv[9]  # Name of the RL model to use
 
 print(f"Running simulation with recompute_interval={recompute_interval}, n_planning={n_planning}, obs_noise={obs_noise}, obs_mu={obs_mu}, act_noise={act_noise}, act_mu={act_mu}")
 
-simulation_time = 10 # in seconds
-dt_physics = 20 # physics timestep in ms (default in MuJoCo is 20ms)
-dt_seconds = dt_physics / 1000.0  # convert ms to seconds
-time_steps = int(simulation_time / dt_seconds)
-
 # Define configuration
 config = {
     'planning_width': 200,
@@ -36,14 +30,13 @@ config = {
     'act_noise_mu': np.array([act_mu]),
     'act_noise_sigma': np.array([act_noise]),
     'n_episodes': 5,
-    'time_steps': time_steps,
+    'time_steps': 3000,
     'action_cost': 0.2,
     'control_model': control_model,
     'recompute_intervals': [recompute_interval],  # Use the command line argument
     'n_planning_values': [n_planning],             # Use the command line argument
     'value': value,
-    'rl_model': rl_model,  # Use the command line argument
-    'dt_physics': dt_physics
+    'rl_model': rl_model  # Use the command line argument
 }
 
 # Run the simulation

@@ -22,8 +22,8 @@ def simulate_one_model(bird, n_episodes, time_steps, recompute_interval, obs_noi
         episode_seed = 54 + epi
         rng = np.random.default_rng(episode_seed)  # One RNG per episode
 
-        env = gym.make("InvertedPendulum-v5", render_mode="rgb_array", reset_noise_scale=0.01) 
-        env.unwrapped.model.opt.timestep = bird.dt_physics/1000.0 # set dt physics which is input in ms so we divide it by 1000; dt for control is model.opt.timestep * frame_skip (default is 2)
+        env = gym.make("InvertedPendulum-v5", render_mode="rgb_array", reset_noise_scale=0.01, frame_skip=1) 
+        env.unwrapped.model.opt.timestep = 0.005 # dt physics; dt for contorl is model.opt.timestep * frame_skip
 
         obs, _ = env.reset(seed=episode_seed)
 
@@ -152,8 +152,8 @@ def run_simulation(interval, n_planning, config):
         action_cost=config['action_cost'],
         control_model=config['control_model'],
         value=config['value'],
-        rl_model=config['rl_model'],
-        dt_physics=config['dt_physics']
+        rl_model=config['rl_model']
+
     )
     
     # Run simulation

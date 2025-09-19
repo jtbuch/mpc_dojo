@@ -8,6 +8,5 @@ from mpc.simulate import *
 import gymnasium as gym
 import torch
 from stable_baselines3 import TD3
-import scipy.linalg
 
 
