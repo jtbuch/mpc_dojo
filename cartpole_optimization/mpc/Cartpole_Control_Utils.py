@@ -363,8 +363,8 @@ def plot_4d_performance_heatmaps(results_folder="results/PerformanceResults/",
                                   color=text_color, fontsize=9, fontweight='bold')
     
     # Add colorbar
-    cbar = fig.colorbar(im, ax=axes, fraction=0.046, pad=0.04, aspect=30)
-    cbar.set_label('Mean Episode Length', fontsize=12)
+    # cbar = fig.colorbar(im, ax=axes, fraction=0.046, pad=0.04, aspect=30)
+    # cbar.set_label('Mean Episode Length', fontsize=12)
     
     # Overall title
     fig.suptitle(f'MPC Performance: Horizon × Recompute × Pole Length Error (N={num_episodes} episodes)', 
