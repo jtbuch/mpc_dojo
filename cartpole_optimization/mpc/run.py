@@ -18,7 +18,7 @@ import time
 
 
 # Parse command line arguments
-length_ratio = int(sys.argv[1])
+length_ratio = float(sys.argv[1])
 recompute_interval = int(sys.argv[2])
 
 print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval}")
