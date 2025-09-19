@@ -105,8 +105,8 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
         raise ValueError("The smallest recompute interval must be less than or equal to the smallest horizon.")
     
     os.makedirs(results_folder, exist_ok=True)
-    video_dir = os.path.join("Results", "Videos", "mpc")
-    os.makedirs(video_dir, exist_ok=True)
+    # video_dir = os.path.join("Results", "Videos", "mpc")
+    # os.makedirs(video_dir, exist_ok=True)
     
     results_length = {}
     results_states = {}
