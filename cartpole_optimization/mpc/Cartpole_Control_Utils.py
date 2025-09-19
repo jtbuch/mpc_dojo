@@ -354,7 +354,7 @@ def plot_4d_performance_heatmaps(results_folder="results/PerformanceResults/",
         axes[idx].set_yticklabels([f'{r:.2f}' for r in recomputes_sec])  # Show recomputes in seconds
         
         # Labels and title with updated units
-        axes[idx].set_xlabel('Horizon (s)', fontsize=11)
+        axes[idx].set_xlabel('Planning Horizon (s)', fontsize=11)
         if idx == 0:
             axes[idx].set_ylabel('Recompute Every (s)', fontsize=11)
         
