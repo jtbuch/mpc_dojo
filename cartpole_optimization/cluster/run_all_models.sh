@@ -11,7 +11,7 @@
 #SBATCH -o log/R-%x.%j.out
 
 # Array of intervals and horizons
-declare -a length_ratios=(1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4 2.6 2.8 3.0)
+declare -a length_ratios=(1.0 1.5 2.0 2.5 3.0)
 declare -a recompute_intervals=(1 2 3 4 5 6 7 8 9 10)
 
 # Loop over all parameters
