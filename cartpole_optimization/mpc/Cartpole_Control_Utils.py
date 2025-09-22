@@ -75,7 +75,13 @@ class MPCController:
         self.mpc.settings.supress_ipopt_output()
         self.mpc.set_param(**{k: v for k, v in setup_mpc.items() if v is not None})
         
-        self.mpc.set_objective(mterm=theta**2 + x**2, lterm=theta**2 + x**2 + 0.01*u**2)
+        self.mpc.set_objective(
+            mterm=theta**2 + x**2, 
+            lterm=theta**2 + x**2 + 0.01*u**2
+        )
+
+        self.mpc.set_rterm(u=0.01)
+    
         self.mpc.bounds['lower','_u','u'] = -self.force_mag
         self.mpc.bounds['upper','_u','u'] = self.force_mag
         
