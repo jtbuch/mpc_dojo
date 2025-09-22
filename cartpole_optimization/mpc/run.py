@@ -20,6 +20,7 @@ import time
 # Parse command line arguments
 length_ratio = float(sys.argv[1])
 recompute_interval = int(sys.argv[2])
+wind_mu = float(sys.argv[3])
 
 print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval}")
 
@@ -41,10 +42,10 @@ results_records = []
 #------------------------------------------------------------------------------------------------------------------------------------------------
 start_time = time.time()
 mpc_results = evaluate_mpc_controllers(
-        horizons=[10, 20,30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
+        horizons=[10, 20,30, 40, 50, 60, 70, 80, 90, 100, 140, 180],
         recompute_intervals=[recompute_interval],
         length_ratios=[length_ratio],
-        wind_mus=[0.0, 0.1, 0.15, 0.2],
+        wind_mus=[wind_mu],
         wind_sigmas=[0.0, 0.2, 0.4, 0.6],
         results_folder="../results/PerformanceResults/",
         episode_length=3000,
