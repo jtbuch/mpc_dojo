@@ -72,6 +72,7 @@ class MPCController:
             'collocation_ni': 1 if not self.linear else None,
             'store_full_solution': True,
         }
+        self.mpc.settings.supress_ipopt_output()
         self.mpc.set_param(**{k: v for k, v in setup_mpc.items() if v is not None})
         
         self.mpc.set_objective(mterm=theta**2 + x**2, lterm=theta**2 + x**2 + 0.01*u**2)
