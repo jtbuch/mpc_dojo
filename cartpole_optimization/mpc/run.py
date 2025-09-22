@@ -42,7 +42,7 @@ results_records = []
 #------------------------------------------------------------------------------------------------------------------------------------------------
 start_time = time.time()
 mpc_results = evaluate_mpc_controllers(
-        horizons=[10, 20,30, 40, 50, 60, 70, 80, 90, 100, 140, 180],
+        horizons=[30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150],
         recompute_intervals=[recompute_interval],
         length_ratios=[length_ratio],
         wind_mus=[wind_mu],
