@@ -12,7 +12,7 @@
 
 # Array of intervals and horizons
 declare -a length_ratios=(1.0 1.5 2.0 2.5 3.0)
-declare -a recompute_intervals=(1 2 3 4 5 6 7)
+declare -a recompute_intervals=(1 2 3 4 5 6)
 declare -a wind_mus=(0.0 0.1 0.15 0.2)
 
 # Loop over all combinations and submit jobs

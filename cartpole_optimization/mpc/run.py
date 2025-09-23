@@ -42,14 +42,13 @@ results_records = []
 #------------------------------------------------------------------------------------------------------------------------------------------------
 start_time = time.time()
 mpc_results = evaluate_mpc_controllers(
-        # horizons=[30, 50, 70, 90, 110, 130, 150, 170],
-        horizons=[190, 210, 230],
+        horizons=[30, 50, 70, 90, 110, 130, 150, 170, 190, 210, 230],
         recompute_intervals=[recompute_interval],
         length_ratios=[length_ratio],
         wind_mus=[wind_mu],
-        wind_sigmas=[0.0, 0.2, 0.4, 0.6],
+        wind_sigmas=[0.0],
         results_folder="../results/PerformanceResults/",
-        episode_length=3000,
-        num_episodes=50,
+        episode_length=2000,
+        num_episodes=10,
         linear=False,
     )
