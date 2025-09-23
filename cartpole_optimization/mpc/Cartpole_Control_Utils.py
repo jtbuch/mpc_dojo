@@ -454,7 +454,8 @@ def plot_4d_performance_heatmaps(results_folder="../results/PerformanceResults/"
                 if not np.isnan(perf_matrix[i, j]):
                     # Use white text for dark colors, black for light colors
                     text_color = 'white' if perf_matrix[i, j] < (vmin + vmax) / 2 else 'black'
-                    axes[idx].text(j, i, f'{perf_matrix[i, j]:.1f}',
+                    # axes[idx].text(j, i, f'{perf_matrix[i, j]:.1f}',
+                    axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
     
@@ -804,7 +805,8 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
             for j in range(len(horizons)):
                 if not np.isnan(perf_matrix[i, j]):
                     text_color = 'white' if perf_matrix[i, j] < (vmin + vmax) / 2 else 'black'
-                    axes[idx].text(j, i, f'{perf_matrix[i, j]:.1f}',
+                    # axes[idx].text(j, i, f'{perf_matrix[i, j]:.1f}',
+                    axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
@@ -946,7 +948,8 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
             for j in range(len(horizons)):
                 if not np.isnan(perf_matrix[i, j]):
                     text_color = 'white' if perf_matrix[i, j] < (vmin + vmax) / 2 else 'black'
-                    axes[idx].text(j, i, f'{perf_matrix[i, j]:.1f}',
+                    # axes[idx].text(j, i, f'{perf_matrix[i, j]:.1f}',
+                    axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
     
