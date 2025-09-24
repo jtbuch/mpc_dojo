@@ -101,7 +101,7 @@ class MPCController:
 
 def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../results/PerformanceResults/", 
                              episode_length=500, num_episodes=20, seed=42, linear=True, 
-                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0]):
+                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0]):
     """Evaluate MPC with various horizons, recompute intervals, pole length misspecifications, and wind conditions."""
     
     timing = [] 
@@ -112,93 +112,88 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
         raise ValueError("The smallest recompute interval must be less than or equal to the smallest horizon.")
     
     os.makedirs(results_folder, exist_ok=True)
-    # video_dir = os.path.join("Results", "Videos", "mpc")
-    # os.makedirs(video_dir, exist_ok=True)
     
     results_length = {}
     results_states = {}
     
     # Add loops over wind parameters
-    for wind_mu in wind_mus:
-        for wind_sigma in wind_sigmas:
-            for h in horizons:
-                for e in recompute_intervals:
-                    for ratio in length_ratios:
-                        model_length = true_length * ratio
-                        start_time = time.time()
-                        
-                        # Updated key to include wind parameters
-                        key = f"h_{h}_e_{e}_ratio_{ratio:.1f}_wmu_{wind_mu:.2f}_wsig_{wind_sigma:.2f}"
-                        results_length[key] = []
-                        results_states[key] = []
-                        
-                        # Pass wind parameters to MPC controller
-                        mpc = MPCController(horizon=h, recompute_every=e, linear=linear, 
-                                          model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
-                        
-                        for ep in range(num_episodes):
-                            if ep == 0:
-                                env = gym.make("CartPole-v1", render_mode="rgb_array")
-                                # ep_video_dir = os.path.join(video_dir, key)
-                                # os.makedirs(ep_video_dir, exist_ok=True)
-                                # env = gym.wrappers.RecordVideo(env, f"{ep_video_dir}/episode_1.mp4", episode_trigger=lambda _: True)
-                            else:
-                                env = gym.make("CartPole-v1", render_mode=None)
+    for init_angle in init_angles:
+        for wind_mu in wind_mus:
+            for wind_sigma in wind_sigmas:
+                for h in horizons:
+                    for e in recompute_intervals:
+                        for ratio in length_ratios:
+                            model_length = true_length * ratio
+                            start_time = time.time()
                             
-                            obs, _ = env.reset(seed=seed + ep)
-                            length, step = 0, 0
-                            done = False
-                            states = []
-
-                            while not done and length < episode_length:
-                                if step % e == 0:
-                                    within_step = 0
-                                    trajectory = mpc.get_action(obs).flatten()
-                                else:
-                                    within_step += 1
-                                
-                                action = trajectory[min(within_step, len(trajectory)-1)]
-                                if action > 0:
-                                    action = 1
-                                else:
-                                    action = 0
-                                
-                                obs, _, done, _, _ = env.step(action)
-                                # Wind effects handled in MPC controller if applicable
-                                states.append(obs)
-                                step += 1
-                                length += 1
+                            # FIXED: Include init_angle in the key
+                            key = f"h_{h}_e_{e}_ratio_{ratio:.1f}_wmu_{wind_mu:.2f}_wsig_{wind_sigma:.2f}_iang_{init_angle:.2f}"
+                            results_length[key] = []
+                            results_states[key] = []
                             
-                            results_length[key].append(length)
-                            states_squared = np.square(states)
-                            results_states[key].append(np.sum(states_squared, axis=0))
-                            env.close()
+                            # Pass wind parameters to MPC controller
+                            mpc = MPCController(horizon=h, recompute_every=e, linear=linear, 
+                                            model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
+                            
+                            for ep in range(num_episodes):
+                                if ep == 0:
+                                    env = gym.make("CartPole-v1", render_mode="rgb_array")
+                                else:
+                                    env = gym.make("CartPole-v1", render_mode=None)
+                                
+                                obs, _ = env.reset(seed=seed + ep, options={"low": init_angle-0.05, "high": init_angle+0.05})
+                                length, step = 0, 0
+                                done = False
+                                states = []
 
-                        end_time = time.time()
-                        elapsed_time = end_time - start_time
-                        timing.append({
-                            "model": "mpc",
-                            "horizon": h,
-                            "recompute_interval": e,
-                            "length_ratio": ratio,
-                            "wind_mu": wind_mu,
-                            "wind_sigma": wind_sigma,
-                            "evaluation_time_seconds": elapsed_time
-                        })
+                                while not done and length < episode_length:
+                                    if step % e == 0:
+                                        within_step = 0
+                                        trajectory = mpc.get_action(obs).flatten()
+                                    else:
+                                        within_step += 1
+                                    
+                                    action = trajectory[min(within_step, len(trajectory)-1)]
+                                    if action > 0:
+                                        action = 1
+                                    else:
+                                        action = 0
+                                    
+                                    obs, _, done, _, _ = env.step(action)
+                                    states.append(obs)
+                                    step += 1
+                                    length += 1
+                                
+                                results_length[key].append(length)
+                                states_squared = np.square(states)
+                                results_states[key].append(np.sum(states_squared, axis=0))
+                                env.close()
 
-                        # Save results with wind parameters in filename
-                        wind_suffix = f"_wmu_{wind_mu:.2f}_wsig_{wind_sigma:.2f}"
-                        np.savetxt(f"{results_folder}/mpc_episode_lengths_{key}.csv", results_length[key], delimiter=",")
-                        np.savetxt(f"{results_folder}/mpc_integrated_errors_{key}.csv", results_states[key], delimiter=",")
+                            end_time = time.time()
+                            elapsed_time = end_time - start_time
+                            timing.append({
+                                "model": "mpc",
+                                "horizon": h,
+                                "recompute_interval": e,
+                                "length_ratio": ratio,
+                                "wind_mu": wind_mu,
+                                "wind_sigma": wind_sigma,
+                                "evaluation_time_seconds": elapsed_time,
+                                'init_angle': init_angle
+                            })
+
+                            # FIXED: Save results with init_angle in filename
+                            np.savetxt(f"{results_folder}/mpc_episode_lengths_{key}.csv", results_length[key], delimiter=",")
+                            np.savetxt(f"{results_folder}/mpc_integrated_errors_{key}.csv", results_states[key], delimiter=",")
 
     timing_results_df = pd.DataFrame(timing)
-    # Update CSV filename to reflect wind conditions
+    # Include init_angle info in the CSV filename
+    init_angle_desc = f"init_angles_{len(init_angles)}" if len(init_angles) > 1 else f"init_angle_{init_angles[0]:.2f}"
     wind_desc = "with_wind" if any(mu != 0.0 or sigma != 0.0 for mu in wind_mus for sigma in wind_sigmas) else "no_wind"
-    results_csv_path = os.path.join(results_folder, f"Training_times_MPC_{wind_desc}.csv")
+    results_csv_path = os.path.join(results_folder, f"Training_times_MPC_{wind_desc}_{init_angle_desc}.csv")
     timing_results_df.to_csv(results_csv_path, index=False)
     
-    return 
-
+    return
 
 def analyze_performance_results_episode_length(results_folder="../results/PerformanceResults/", 
                                 episode_length=500,
@@ -961,6 +956,170 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
     # Save plot
     plt.tight_layout()
     save_path = os.path.join(results_folder, f"mpc_wind_sigma_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}.png")
+    plt.savefig(save_path, bbox_inches="tight", dpi=300)
+    print(f"\nPlot saved to: {save_path}")
+    plt.show()
+    
+    return
+
+
+def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/", 
+                                      init_angles=[0.0, 0.1, 0.2, 0.3, 0.4],
+                                      length_ratio=1.0,
+                                      wind_mu=0.0,
+                                      wind_sigma=0.0,
+                                      num_episodes=20,
+                                      dt=0.02):
+    """
+    Create multiple heatmaps showing horizon × recompute performance for each initial angle.
+    Works with the corrected evaluation function that includes init_angle in filenames.
+    """
+    
+    # Get CSV files with init_angle in filename (look for 'iang')
+    files = [file for file in os.listdir(results_folder) if file.endswith(".csv")]
+    files = [file for file in files if "episode_lengths" in file and "mpc" in file and "iang" in file]
+    
+    if not files:
+        print("No files with initial angle data found!")
+        print("Make sure your evaluation function includes init_angle ('iang') in filenames")
+        print("Expected filename format: mpc_episode_lengths_h_X_e_Y_ratio_Z_wmu_A_wsig_B_iang_C.csv")
+        return None
+    
+    results = []
+    for file in files:
+        try:
+            data = np.loadtxt(os.path.join(results_folder, file), delimiter=",")
+            mean = np.mean(data)
+            std = np.std(data)
+            
+            # Parse filename: mpc_episode_lengths_h_X_e_Y_ratio_Z_wmu_A_wsig_B_iang_C.csv
+            parts = file.replace("mpc_episode_lengths_", "").replace(".csv", "").split("_")
+            file_horizon = int(parts[1])
+            file_recompute = int(parts[3])
+            file_ratio = float(parts[5])
+            file_wind_mu = float(parts[7])  
+            file_wind_sigma = float(parts[9])
+            file_init_angle = float(parts[11])  # This is the init_angle from 'iang'
+            
+            results.append({
+                'horizon': file_horizon,
+                'recompute': file_recompute,
+                'length_ratio': file_ratio,
+                'wind_mu': file_wind_mu,
+                'wind_sigma': file_wind_sigma,
+                'init_angle': file_init_angle,
+                'mean_length': mean,
+                'std_length': std
+            })
+        except Exception as e:
+            print(f"Error parsing {file}: {e}")
+            continue
+    
+    if not results:
+        print("No valid data found!")
+        return
+    
+    df = pd.DataFrame(results)
+    
+    # Filter for specified parameters
+    filtered_data = df[
+        (df['length_ratio'] == length_ratio) & 
+        (df['wind_mu'] == wind_mu) &
+        (df['wind_sigma'] == wind_sigma)
+    ]
+    
+    if filtered_data.empty:
+        print(f"No data found for ratio={length_ratio}, mu={wind_mu}, sigma={wind_sigma}")
+        return
+    
+    # Get unique values for axes
+    horizons = sorted(filtered_data['horizon'].unique())
+    recomputes = sorted(filtered_data['recompute'].unique())
+    available_init_angles = sorted(filtered_data['init_angle'].unique())
+    
+    # Convert to seconds for display
+    horizons_sec = [h * dt for h in horizons]
+    recomputes_sec = [r * dt for r in recomputes]
+    
+    # Filter to requested init_angles that exist
+    plot_init_angles = [angle for angle in init_angles if angle in available_init_angles]
+    
+    if not plot_init_angles:
+        print(f"None of the requested init_angles {init_angles} found in data")
+        print(f"Available init_angles: {available_init_angles}")
+        return
+    
+    print(f"Found data for horizons: {horizons}")
+    print(f"Found data for recompute intervals: {recomputes}")
+    print(f"Plotting initial angles: {plot_init_angles}")
+    
+    # Create figure with subplots - ONE SUBPLOT PER INIT_ANGLE
+    fig, axes = plt.subplots(1, len(plot_init_angles), figsize=(4*len(plot_init_angles), 5))
+    
+    # Handle case with single subplot
+    if len(plot_init_angles) == 1:
+        axes = [axes]
+    
+    # Global min/max for consistent color scale
+    all_performance_sec = filtered_data['mean_length'].values * dt
+    vmin, vmax = np.nanmin(all_performance_sec), np.nanmax(all_performance_sec)
+    
+    # CREATE SEPARATE HEATMAP FOR EACH INIT_ANGLE
+    for idx, init_angle in enumerate(plot_init_angles):
+        angle_data = filtered_data[filtered_data['init_angle'] == init_angle]
+        
+        # Create performance matrix: recompute (rows) × horizon (cols)
+        perf_matrix = np.full((len(recomputes), len(horizons)), np.nan)
+        
+        for i, recompute in enumerate(recomputes):
+            for j, horizon in enumerate(horizons):
+                subset = angle_data[(angle_data['recompute'] == recompute) & 
+                                  (angle_data['horizon'] == horizon)]
+                if len(subset) > 0:
+                    perf_matrix[i, j] = subset['mean_length'].iloc[0] * dt
+        
+        # Create heatmap
+        im = axes[idx].imshow(perf_matrix, cmap='viridis', aspect='auto', 
+                             vmin=vmin, vmax=vmax, origin='lower')
+        
+        # Set ticks and labels
+        axes[idx].set_xticks(range(len(horizons)))
+        axes[idx].set_xticklabels([f'{h:.1f}' for h in horizons_sec])
+        axes[idx].set_yticks(range(len(recomputes)))
+        axes[idx].set_yticklabels([f'{r:.2f}' for r in recomputes_sec])
+        
+        # Labels and title
+        axes[idx].set_xlabel('Planning Horizon (s)', fontsize=11)
+        if idx == 0:
+            axes[idx].set_ylabel('Recompute Every (s)', fontsize=11)
+        
+        # Title with init angle
+        title = f'Init Angle = {init_angle:.2f} rad'
+        if init_angle == 0.0:
+            title += '\n(Upright)'
+        else:
+            degrees = init_angle * 180 / np.pi
+            title += f'\n({degrees:.1f}°)'
+        axes[idx].set_title(title, fontsize=12, fontweight='bold')
+        
+        # Add text values
+        for i in range(len(recomputes)):
+            for j in range(len(horizons)):
+                if not np.isnan(perf_matrix[i, j]):
+                    text_color = 'white' if perf_matrix[i, j] < (vmin + vmax) / 2 else 'black'
+                    axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
+                                  ha="center", va="center", 
+                                  color=text_color, fontsize=9, fontweight='bold')
+    
+    # # Add colorbar
+    # fig.colorbar(im, ax=axes, shrink=0.6, label='Episode Length (s)')
+    
+    # Overall title
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Initial Angle\n(length_ratio={length_ratio}, wind_μ={wind_mu}, wind_σ={wind_sigma}, N={num_episodes} episodes)', 
+                 fontsize=16, fontweight='bold', y=0.98)
+    
+    plt.tight_layout()
+    save_path = os.path.join(results_folder, f"mpc_init_angle_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_s{wind_sigma:.1f}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
