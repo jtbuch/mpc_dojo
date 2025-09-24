@@ -11,9 +11,9 @@
 #SBATCH -o log/R-%x.%j.out
 
 # Array of intervals and horizons
-declare -a length_ratios=(1.0 1.5 2.0 2.5 3.0)
-declare -a recompute_intervals=(1 2 3 4 5 6)
-declare -a wind_mus=(0.0 0.1 0.15 0.2)
+declare -a length_ratios=(1.0 2.0 3.0 4.0)
+declare -a recompute_intervals=(1 2 3 4 5 6 7)
+declare -a wind_mus=(0.0 0.1 0.2 0.3)
 
 # Loop over all combinations and submit jobs
 for length_ratio in "${length_ratios[@]}"; do
@@ -22,7 +22,7 @@ for length_ratio in "${length_ratios[@]}"; do
             sbatch \
                 --job-name="MPC_len${length_ratio}_recompute${recompute_interval}_wind${wind_mu}" \
                 --account=carney-ashenhav-condo \
-                --time=60:00:00 \
+                --time=80:00:00 \
                 --mem=10G \
                 --nodes=1 \
                 -o "log/MPC_len${length_ratio}_recompute${recompute_interval}_wind${wind_mu}.%j.out" \
