@@ -189,7 +189,8 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                     'linear': linear,
                                     'episode_length': episode_length,
                                     'num_episodes': num_episodes,
-                                    'seed': seed
+                                    'seed': seed,
+                                    'action_space': action_space
                                 },
                                 'results': {
                                     'episode_lengths': episode_lengths,
@@ -205,8 +206,8 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                     'std_episode_time': np.std(episode_times)
                                 }
                             }
-                            
-                            filename = f"mpc_h{h}_e{e}_r{ratio:.1f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
+
+                            filename = f"mpc_h{h}_e{e}_r{ratio:.1f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}_as{action_space}.pkl"
                             filepath = os.path.join(results_folder, filename)
                             
                             with open(filepath, 'wb') as f:
@@ -320,13 +321,14 @@ def analyze_performance_results_episode_length(results_folder="../results/Perfor
     
     return
 
-def plot_4d_performance_heatmaps(results_folder="../results/PerformanceResults/", 
+def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/", 
                                 length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6],
                                 wind_mu=0.0,
                                 wind_sigma=0.0,
                                 init_angle=0.0,
                                 num_episodes=20,
-                                dt=0.02):
+                                dt=0.02,
+                                action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each pole error ratio."""
     
     df = load_results_data(results_folder)
@@ -338,11 +340,12 @@ def plot_4d_performance_heatmaps(results_folder="../results/PerformanceResults/"
     filtered_data = df[
         (df['wind_mu'] == wind_mu) & 
         (df['wind_sigma'] == wind_sigma) &
-        (df['init_angle'] == init_angle)
+        (df['init_angle'] == init_angle) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
-        print(f"No data found for wind_mu={wind_mu}, wind_sigma={wind_sigma}, init_angle={init_angle}")
+        print(f"No data found for wind_mu={wind_mu}, wind_sigma={wind_sigma}, init_angle={init_angle}, action_space={action_space}")
         return
     
     horizons = sorted(filtered_data['horizon'].unique())
@@ -407,147 +410,16 @@ def plot_4d_performance_heatmaps(results_folder="../results/PerformanceResults/"
                     axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
-    
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Pole Length Error\n(wind_μ={wind_mu}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Pole Length Error\n(wind_μ={wind_mu}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_4d_performance_heatmaps_wmu{wind_mu}_wsig{wind_sigma}_iang{init_angle:.2f}.png")
+    save_path = os.path.join(results_folder, f"mpc_4d_performance_heatmaps_wmu{wind_mu}_wsig{wind_sigma}_iang{init_angle:.2f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
 
-def analyze_wind_mu_performance(results_folder="../results/PerformanceResults/", 
-                               episode_length=500,
-                               num_episodes=20,
-                               wind_mus=[0.0, 0.5, 1.0, 1.5, 2.0],
-                               horizon=20,
-                               length_ratio=1.0,
-                               wind_sigma=0.0,
-                               init_angle=0.0,
-                               dt=0.02):
-    """Analyze MPC performance vs wind mean (mu) for different recompute frequencies."""
-    
-    df = load_results_data(results_folder)
-    
-    if df.empty:
-        print("No data found!")
-        return
-    
-    filtered_data = df[
-        (df['horizon'] == horizon) & 
-        (df['length_ratio'] == length_ratio) &
-        (df['wind_sigma'] == wind_sigma) &
-        (df['init_angle'] == init_angle)
-    ]
-    
-    if filtered_data.empty:
-        print(f"No data found for h={horizon}, ratio={length_ratio}, sigma={wind_sigma}, init_angle={init_angle}")
-        return
-    
-    horizon_sec = horizon * dt
-    
-    plt.figure(figsize=(10, 6))
-    
-    recompute_values = sorted(filtered_data['recompute_interval'].unique())
-    colors = plt.cm.viridis(np.linspace(0, 1, len(recompute_values)))
-    
-    for i, recompute in enumerate(recompute_values):
-        subset = filtered_data[filtered_data['recompute_interval'] == recompute].sort_values('wind_mu')
-        if len(subset) > 0:
-            recompute_sec = recompute * dt
-            label = f'Recompute every {recompute_sec:.2f}s'
-            
-            mean_length_sec = subset['mean_episode_length'] * dt
-            std_length_sec = subset['std_episode_length'] * dt
-            
-            plt.errorbar(subset['wind_mu'], mean_length_sec, yerr=std_length_sec,
-                        marker='o', label=label, capsize=3, linewidth=2, markersize=8, color=colors[i])
-    
-    max_episode_length_sec = episode_length * dt
-    plt.axhline(y=max_episode_length_sec, color='red', linestyle='--', alpha=0.7, linewidth=2, label='Max Episode Length')
-    
-    plt.title(f'MPC Performance: Wind Mean vs Recompute Frequency\n(h={horizon_sec:.1f}s, length_ratio={length_ratio}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
-              fontsize=14, fontweight='bold')
-    plt.xlabel('Wind Mean (μ)', fontsize=12)
-    plt.ylabel('Mean Episode Length (s) (± SD)', fontsize=12)
-    plt.legend(fontsize=10)
-    plt.grid(True, alpha=0.3)
-    plt.ylim(0, max_episode_length_sec + 4)
-    
-    plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_wind_mu_analysis_h{horizon}_r{length_ratio:.1f}_s{wind_sigma:.1f}_iang{init_angle:.2f}.png")
-    plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    print(f"\nPlot saved to: {save_path}")
-    
-    plt.show()
-    return 
-
-def analyze_wind_sigma_performance(results_folder="../results/PerformanceResults/", 
-                                  episode_length=500,
-                                  num_episodes=20,
-                                  wind_sigmas=[0.0, 0.5, 1.0, 1.5, 2.0],
-                                  horizon=20,
-                                  length_ratio=1.0,
-                                  wind_mu=0.0,
-                                  init_angle=0.0,
-                                  dt=0.02):
-    """Analyze MPC performance vs wind std dev (sigma) for different recompute frequencies."""
-    
-    df = load_results_data(results_folder)
-    
-    if df.empty:
-        print("No data found!")
-        return
-    
-    filtered_data = df[
-        (df['horizon'] == horizon) & 
-        (df['length_ratio'] == length_ratio) &
-        (df['wind_mu'] == wind_mu) &
-        (df['init_angle'] == init_angle)
-    ]
-    
-    if filtered_data.empty:
-        print(f"No data found for h={horizon}, ratio={length_ratio}, mu={wind_mu}, init_angle={init_angle}")
-        return
-    
-    horizon_sec = horizon * dt
-    
-    plt.figure(figsize=(10, 6))
-    
-    recompute_values = sorted(filtered_data['recompute_interval'].unique())
-    colors = plt.cm.viridis(np.linspace(0, 1, len(recompute_values)))
-    
-    for i, recompute in enumerate(recompute_values):
-        subset = filtered_data[filtered_data['recompute_interval'] == recompute].sort_values('wind_sigma')
-        if len(subset) > 0:
-            recompute_sec = recompute * dt
-            label = f'Recompute every {recompute_sec:.2f}s'
-            
-            mean_length_sec = subset['mean_episode_length'] * dt
-            std_length_sec = subset['std_episode_length'] * dt
-            
-            plt.errorbar(subset['wind_sigma'], mean_length_sec, yerr=std_length_sec,
-                        marker='o', label=label, capsize=3, linewidth=2, markersize=8, color=colors[i])
-    
-    max_episode_length_sec = episode_length * dt
-    plt.axhline(y=max_episode_length_sec, color='red', linestyle='--', alpha=0.7, linewidth=2, label='Max Episode Length')
-    
-    plt.title(f'MPC Performance: Wind Std Dev vs Recompute Frequency\n(h={horizon_sec:.1f}s, length_ratio={length_ratio}, wind_μ={wind_mu}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
-              fontsize=14, fontweight='bold')
-    plt.xlabel('Wind Standard Deviation (σ)', fontsize=12)
-    plt.ylabel('Mean Episode Length (s) (± SD)', fontsize=12)
-    plt.legend(fontsize=10)
-    plt.grid(True, alpha=0.3)
-    plt.ylim(0, max_episode_length_sec + 4)
-    
-    plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_wind_sigma_analysis_h{horizon}_r{length_ratio:.1f}_m{wind_mu:.1f}_iang{init_angle:.2f}.png")
-    plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    print(f"\nPlot saved to: {save_path}")
-    
-    plt.show()
-    return 
 
 def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/", 
                          wind_mus=[0.0, 0.5, 1.0, 1.5, 2.0],
@@ -555,7 +427,8 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
                          wind_sigma=0.0,
                          init_angle=0.0,
                          num_episodes=20,
-                         dt=0.02):
+                         dt=0.02,
+                         action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each wind_mu level."""
     
     df = load_results_data(results_folder)
@@ -567,11 +440,12 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
     filtered_data = df[
         (df['length_ratio'] == length_ratio) & 
         (df['wind_sigma'] == wind_sigma) &
-        (df['init_angle'] == init_angle)
+        (df['init_angle'] == init_angle) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
-        print(f"No data found for ratio={length_ratio}, sigma={wind_sigma}, init_angle={init_angle}")
+        print(f"No data found for ratio={length_ratio}, sigma={wind_sigma}, init_angle={init_angle}, action_space={action_space}")
         return
     
     horizons = sorted(filtered_data['horizon'].unique())
@@ -630,11 +504,11 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Mean\n(length_ratio={length_ratio}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Mean\n(length_ratio={length_ratio}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_wind_mu_heatmaps_r{length_ratio:.1f}_s{wind_sigma:.1f}_iang{init_angle:.2f}.png")
+    save_path = os.path.join(results_folder, f"mpc_wind_mu_heatmaps_r{length_ratio:.1f}_s{wind_sigma:.1f}_iang{init_angle:.2f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
@@ -647,7 +521,8 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
                             wind_mu=0.0,
                             init_angle=0.0,
                             num_episodes=20,
-                            dt=0.02):
+                            dt=0.02,
+                            action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each wind_sigma level."""
     
     df = load_results_data(results_folder)
@@ -659,11 +534,12 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
     filtered_data = df[
         (df['length_ratio'] == length_ratio) & 
         (df['wind_mu'] == wind_mu) &
-        (df['init_angle'] == init_angle)
+        (df['init_angle'] == init_angle) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
-        print(f"No data found for ratio={length_ratio}, mu={wind_mu}, init_angle={init_angle}")
+        print(f"No data found for ratio={length_ratio}, mu={wind_mu}, init_angle={init_angle}, action_space={action_space}")
         return
     
     horizons = sorted(filtered_data['horizon'].unique())
@@ -721,18 +597,17 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
                     axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
-    
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Std Dev\n(length_ratio={length_ratio}, wind_μ={wind_mu}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Std Dev\n(length_ratio={length_ratio}, wind_μ={wind_mu}, init_angle={init_angle:.2f}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_wind_sigma_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_iang{init_angle:.2f}.png")
+    save_path = os.path.join(results_folder, f"mpc_wind_sigma_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_iang{init_angle:.2f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
     
     return
-
 
 def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/", 
                                       init_angles=[0.0, 0.1, 0.2, 0.3, 0.4],
@@ -740,7 +615,8 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
                                       wind_mu=0.0,
                                       wind_sigma=0.0,
                                       num_episodes=20,
-                                      dt=0.02):
+                                      dt=0.02,
+                                      action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each initial angle."""
     
     df = load_results_data(results_folder)
@@ -752,7 +628,8 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
     filtered_data = df[
         (df['length_ratio'] == length_ratio) & 
         (df['wind_mu'] == wind_mu) &
-        (df['wind_sigma'] == wind_sigma)
+        (df['wind_sigma'] == wind_sigma) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
@@ -824,12 +701,12 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
                     axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
-    
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Initial Angle\n(length_ratio={length_ratio}, wind_μ={wind_mu}, wind_σ={wind_sigma}, N={num_episodes} episodes)', 
+
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Initial Angle\n(length_ratio={length_ratio}, wind_μ={wind_mu}, wind_σ={wind_sigma}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_init_angle_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_s{wind_sigma:.1f}.png")
+    save_path = os.path.join(results_folder, f"mpc_init_angle_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_s{wind_sigma:.1f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()

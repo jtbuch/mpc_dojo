@@ -51,6 +51,6 @@ mpc_results = evaluate_mpc_controllers(
         episode_length=2000,
         num_episodes=10,
         linear=False,
-        init_angles=[0.0],
+        init_angles=[0.0, 0.05, 0.1, 0.15],
         action_space='continuous'
     )
