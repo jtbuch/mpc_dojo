@@ -126,18 +126,12 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                             
                             for ep in range(num_episodes):
                                 episode_start_time = time.time()
-                                
-                                if ep == 0:
-                                    if action_space == 'discrete':
-                                        env = RecordVideo(gym.make("CartPole-v1", render_mode="rgb_array"), video_folder=results_folder, episode_trigger=lambda x: True)
-                                    else:
-                                        env = RecordVideo(gym.make("InvertedPendulum-v5", render_mode="rgb_array"), video_folder=results_folder, episode_trigger=lambda x: True)
-                                else:
-                                    if action_space == 'discrete':
-                                        env = gym.make("CartPole-v1", render_mode=None)
-                                    else:
-                                        env = gym.make("InvertedPendulum-v5", render_mode=None)
-                                
+                                                              
+                                if action_space == 'discrete':
+                                    env = gym.make("CartPole-v1", render_mode=None)
+                                elif action_space == 'continuous':
+                                    env = gym.make("InvertedPendulum-v5", render_mode=None)
+                                        
                                 obs, _ = env.reset(seed=seed + ep, options={"low": init_angle-0.05, "high": init_angle+0.05})
                                 length, step = 0, 0
                                 done = False
