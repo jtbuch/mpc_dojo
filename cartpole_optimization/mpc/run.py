@@ -25,12 +25,10 @@ wind_mu = float(sys.argv[3])
 print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval}")
 
 # Create 'Results' folder if it doesn't exist
-models_folder = "../results/Trained_Models/"
 results_folder = "../results/PerformanceResults/"
-videos_folder = "../results/Videos/"
 
 # Make sure the folders exist
-for folder in [models_folder, results_folder, videos_folder]:
+for folder in [results_folder]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
