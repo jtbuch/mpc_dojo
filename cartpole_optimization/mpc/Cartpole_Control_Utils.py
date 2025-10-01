@@ -96,7 +96,7 @@ class MPCController:
 
 def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../results/PerformanceResults/", 
                              episode_length=500, num_episodes=20, seed=42, linear=True, 
-                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0]):
+                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0],action_space='discrete'):
     """Evaluate MPC with various parameters and save each configuration separately."""
     
     true_length = 0.5
@@ -128,9 +128,15 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                 episode_start_time = time.time()
                                 
                                 if ep == 0:
-                                    env = gym.make("CartPole-v1", render_mode="rgb_array")
+                                    if action_space == 'discrete':
+                                        env = RecordVideo(gym.make("CartPole-v1", render_mode="rgb_array"), video_folder=results_folder, episode_trigger=lambda x: True)
+                                    else:
+                                        env = RecordVideo(gym.make("InvertedPendulum-v5", render_mode="rgb_array"), video_folder=results_folder, episode_trigger=lambda x: True)
                                 else:
-                                    env = gym.make("CartPole-v1", render_mode=None)
+                                    if action_space == 'discrete':
+                                        env = gym.make("CartPole-v1", render_mode=None)
+                                    else:
+                                        env = gym.make("InvertedPendulum-v5", render_mode=None)
                                 
                                 obs, _ = env.reset(seed=seed + ep, options={"low": init_angle-0.05, "high": init_angle+0.05})
                                 length, step = 0, 0
@@ -145,10 +151,14 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                         within_step += 1
                                     
                                     action = trajectory[min(within_step, len(trajectory)-1)]
-                                    if action > 0:
-                                        action = 1
+
+                                    if action_space == 'discrete':
+                                        if action > 0:
+                                            action = 1
+                                        else:
+                                            action = 0
                                     else:
-                                        action = 0
+                                        action = np.array([np.clip(action, -3.0, 3.0)]) 
                                     
                                     obs, _, done, _, _ = env.step(action)
                                     states.append(obs)

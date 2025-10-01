@@ -47,9 +47,10 @@ mpc_results = evaluate_mpc_controllers(
         length_ratios=[length_ratio],
         wind_mus=[wind_mu],
         wind_sigmas=[0.0],
-        results_folder="../results/PerformanceResults/",
+        results_folder="../results/PerformanceResults_Continuous/",
         episode_length=2000,
         num_episodes=10,
         linear=False,
-        init_angles=[0.0, 0.05, 0.1, 0.15]
+        init_angles=[0.0],
+        action_space='continuous'
     )
