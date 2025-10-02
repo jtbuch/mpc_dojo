@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.abspath(os.path.join('..')))
 from mpc.Cartpole_Control_Utils import *
 import time
 
-
 # Parse command line arguments
 length_ratio = float(sys.argv[1])
 recompute_interval = int(sys.argv[2])
@@ -52,3 +51,5 @@ mpc_results = evaluate_mpc_controllers(
         init_angles=[0.0, 0.05, 0.1, 0.15],
         action_space='continuous'
     )
+
+
