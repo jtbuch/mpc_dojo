@@ -133,6 +133,10 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                     env = gym.make("InvertedPendulum-v5", render_mode=None)
                                         
                                 obs, _ = env.reset(seed=seed + ep, options={"low": init_angle-0.05, "high": init_angle+0.05})
+                                
+                                if action_space == 'continuous':
+                                    obs = np.array([obs[0], obs[2], obs[1], obs[3]])
+
                                 length, step = 0, 0
                                 done = False
                                 states = []
@@ -155,6 +159,10 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                         action = np.array([np.clip(action, -3.0, 3.0)]) 
                                     
                                     obs, _, done, _, _ = env.step(action)
+                                    
+                                    if action_space == 'continuous':
+                                        obs = np.array([obs[0], obs[2], obs[1], obs[3]])
+                                        
                                     states.append(obs)
                                     step += 1
                                     length += 1
