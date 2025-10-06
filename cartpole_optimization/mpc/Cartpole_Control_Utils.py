@@ -71,15 +71,23 @@ class MPCController:
         self.mpc.settings.supress_ipopt_output()
         self.mpc.set_param(**{k: v for k, v in setup_mpc.items() if v is not None})
         
+        # self.mpc.set_objective(
+        #     mterm=theta**2 + x**2, 
+        #     lterm=theta**2 + x**2 + 0.01*u**2
+        # )
+
         self.mpc.set_objective(
-            mterm=theta**2 + x**2, 
-            lterm=theta**2 + x**2 + 0.01*u**2
+            mterm=10*theta**2 + x**2 + theta_dot**2 + x_dot**2,
+            lterm=10*theta**2 + x**2 + theta_dot**2 + x_dot**2 + 0.01*u**2
         )
 
-        self.mpc.set_rterm(u=0.01)
+        self.mpc.set_rterm(u=0.1)
     
         self.mpc.bounds['lower','_u','u'] = -self.force_mag
         self.mpc.bounds['upper','_u','u'] = self.force_mag
+
+        self.mpc.bounds['lower','_x','x'] = -3.0  # Cart position limits
+        self.mpc.bounds['upper','_x','x'] = 3.0
         
         self.mpc.setup()
 
@@ -129,7 +137,7 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                 if action_space == 'discrete':
                                     env = gym.make("CartPole-v1", render_mode=None)
                                 elif action_space == 'continuous':
-                                    env = gym.make("InvertedPendulum-v5", render_mode=None)
+                                    env = gym.make("InvertedPendulum-v5", render_mode=None, reset_noise_scale=0.01)
                                         
                                 obs, _ = env.reset(seed=seed + ep, options={"low": init_angle-0.05, "high": init_angle+0.05})
                                 
@@ -147,15 +155,21 @@ def evaluate_mpc_controllers(horizons, recompute_intervals, results_folder="../r
                                     else:
                                         within_step += 1
                                     
-                                    action = trajectory[min(within_step, len(trajectory)-1)]
+                                    # action = trajectory[min(within_step, len(trajectory)-1)]
+                                    action = trajectory[within_step]
+                                    # print(f"Step: {step}, Within step: {within_step}, Action: {action}")
 
                                     if action_space == 'discrete':
                                         if action > 0:
                                             action = 1
                                         else:
                                             action = 0
+                                        
+
                                     else:
                                         action = np.array([np.clip(action, -3.0, 3.0)]) 
+                                        # print(f"Action before clipping: {action}")
+                                        # print(f"Action type: {type(action)}")
                                     
                                     obs, _, done, _, _ = env.step(action)
                                     
