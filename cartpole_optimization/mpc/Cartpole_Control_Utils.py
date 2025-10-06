@@ -14,7 +14,7 @@ class MPCController:
         self.dt = dt
         self.linear = linear
         self.recompute_every = recompute_every
-        self.force_mag = 10.0
+        self.force_mag = 3.0
         self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
@@ -87,7 +87,6 @@ class MPCController:
         obs_with_noise = obs.copy()
         wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma)
         obs_with_noise[2] += wind_disturbance
-        
         self.mpc.x0 = np.array(obs_with_noise).reshape(-1, 1)
         self.mpc.set_initial_guess()
         self.mpc.make_step(self.mpc.x0)
