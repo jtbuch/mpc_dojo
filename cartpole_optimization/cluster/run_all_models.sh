@@ -23,7 +23,7 @@ for length_ratio in "${length_ratios[@]}"; do
                 --job-name="MPC_len${length_ratio}_recompute${recompute_interval}_wind${wind_mu}" \
                 --account=carney-ashenhav-condo \
                 --time=80:00:00 \
-                --mem=10G \
+                --mem=40G \
                 --nodes=1 \
                 -o "log/MPC_len${length_ratio}_recompute${recompute_interval}_wind${wind_mu}.%j.out" \
                 run_one_model.sh "$length_ratio" "$recompute_interval" "$wind_mu"
