@@ -393,7 +393,6 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
                                     'wind_mu': wind_mu,
                                     'wind_sigma': wind_sigma,
                                     'init_angle': init_angle,
-                                    'linear': linear,
                                     'episode_length': episode_length,
                                     'num_episodes': num_episodes,
                                     'seed': seed
