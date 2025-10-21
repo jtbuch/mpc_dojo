@@ -8,79 +8,16 @@ import do_mpc
 import time
 import pickle
 import mujoco
-from scipy.integrate import solve_ivp
-
-def cartpole_dynamics(state, action, linear=False, model_length=1.0):
-    """
-    Compute derivatives for cartpole dynamics
-    state = [x, theta, x_dot, theta_dot]
-    action = force applied to cart
-    """
-    # Define all constants within function
-    gravity = 9.81
-    masscart = 1.0
-    masspole = 0.1
-    
-    length = model_length
-    total_mass = masscart + masspole
-    polemass_length = masspole * length
-
-    x = state[0]
-    theta = state[1]
-    x_dot = state[2]
-    theta_dot = state[3]
-    u = action
-    
-    if linear:
-        temp = u / total_mass
-        thetaacc = (gravity * theta - temp) / (
-            length * (4.0/3.0 - masspole/total_mass)
-        )
-        xacc = temp - polemass_length * thetaacc / total_mass
-    else:
-        costheta = np.cos(theta)
-        sintheta = np.sin(theta)
-        temp = (u + polemass_length * theta_dot**2 * sintheta) / total_mass
-        thetaacc = (gravity * sintheta - costheta * temp) / (
-            length * (4.0/3.0 - masspole * costheta**2 / total_mass)
-        )
-        xacc = temp - polemass_length * thetaacc * costheta / total_mass
-        
-    return np.array([x_dot, theta_dot, xacc, thetaacc])
-
-def rk4_step(state, action, dt, linear=False, model_length=1.0):
-    """
-    Single RK4 integration step for cartpole dynamics
-    
-    Args:
-        state: Current state [x, theta, x_dot, theta_dot]
-        action: Control input (scalar)
-        dt: Time step
-        linear: Whether to use linear dynamics
-        model_length: Pole length
-    
-    Returns:
-        next_state: State after one RK4 step
-    """
-    # RK4 integration
-    k1 = cartpole_dynamics(state, action, linear, model_length)
-    k2 = cartpole_dynamics(state + 0.5 * dt * k1, action, linear, model_length)
-    k3 = cartpole_dynamics(state + 0.5 * dt * k2, action, linear, model_length)
-    k4 = cartpole_dynamics(state + dt * k3, action, linear, model_length)
-    
-    # Combine the slopes
-    next_state = state + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
-    
-    return next_state
 
 class MPCController:
-    def __init__(self, horizon=10, dt=0.02, linear=False, recompute_every=1, model_length=1.0, wind_mu=0.0, wind_sigma=0.0):
+    def __init__(self, horizon=10, dt=0.02, linear=False, recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0, action_space='continuous'):
+        self.action_space = action_space
         self.horizon = horizon
         self.dt = dt
         self.linear = linear
         self.recompute_every = recompute_every
         self.force_mag = 3.0
-        self.gravity = 9.81
+        self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
         
@@ -94,12 +31,25 @@ class MPCController:
         self.model = do_mpc.model.Model(model_type)
         
         x = self.model.set_variable(var_type='_x', var_name='x', shape=(1,1))
-        theta = self.model.set_variable(var_type='_x', var_name='theta', shape=(1,1))  
-        x_dot = self.model.set_variable(var_type='_x', var_name='x_dot', shape=(1,1))  
+        x_dot = self.model.set_variable(var_type='_x', var_name='x_dot', shape=(1,1))
+        theta = self.model.set_variable(var_type='_x', var_name='theta', shape=(1,1))
         theta_dot = self.model.set_variable(var_type='_x', var_name='theta_dot', shape=(1,1))
         u = self.model.set_variable(var_type='_u', var_name='u', shape=(1,1))
         
-        x_dot, theta_dot, xacc, thetaacc = cartpole_dynamics([x, theta, x_dot, theta_dot], u, self.linear, self.length)
+        if self.linear:
+            temp = u / self.total_mass
+            thetaacc = (self.gravity * theta - temp) / (
+                self.length * (4.0/3.0 - self.masspole/self.total_mass)
+            )
+            xacc = temp - self.polemass_length * thetaacc / self.total_mass
+        else:
+            costheta = np.cos(theta)
+            sintheta = np.sin(theta)
+            temp = (u + self.polemass_length * theta_dot**2 * sintheta) / self.total_mass
+            thetaacc = (self.gravity * sintheta - costheta * temp) / (
+                self.length * (4.0/3.0 - self.masspole * costheta**2 / self.total_mass)
+            )
+            xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
         
         self.model.set_rhs('x', x_dot)
         self.model.set_rhs('x_dot', xacc)
@@ -122,42 +72,35 @@ class MPCController:
         }
         self.mpc.settings.supress_ipopt_output()
         self.mpc.set_param(**{k: v for k, v in setup_mpc.items() if v is not None})
-
+ 
         self.mpc.set_objective(
-            mterm=10*theta**2 + x**2 + theta_dot**2 + x_dot**2,  # Terminal cost
-            lterm=10*theta**2 + x**2 + theta_dot**2 + x_dot**2 # Stage cost with action
-            )
+            mterm=10*theta**2 + x**2 + theta_dot**2 + x_dot**2,
+            lterm=10*theta**2 + x**2 + theta_dot**2 + x_dot**2 + 0.1*u**2
+        )
+
         self.mpc.set_rterm(u=0.1)
+    
         self.mpc.bounds['lower','_u','u'] = -self.force_mag
         self.mpc.bounds['upper','_u','u'] = self.force_mag
 
-        self.mpc.bounds['lower','_x','x'] = -3.0  # Cart position limits
-        self.mpc.bounds['upper','_x','x'] = 3.0
+        # self.mpc.bounds['lower','_x','x'] = -3.0  # Cart position limits
+        # self.mpc.bounds['upper','_x','x'] = 3.0
         
         self.mpc.setup()
 
     def get_action(self, obs, env):
         obs_with_noise = obs.copy()
         wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma)
-        obs_with_noise[0] += wind_disturbance
+        obs_with_noise[2] += wind_disturbance
         self.mpc.x0 = np.array(obs_with_noise).reshape(-1, 1)
         self.mpc.set_initial_guess()
         self.mpc.make_step(self.mpc.x0)
         trajectory = self.mpc.data.prediction(('_u',))
-        
-        # Get predictions and remove the initial state (index 0)
-        x_pred = self.mpc.data.prediction(('_x', 'x')).squeeze()[1:]  # Skip x[0]
-        theta_pred = self.mpc.data.prediction(('_x','theta')).squeeze()[1:]
-        x_dot_pred = self.mpc.data.prediction(('_x', 'x_dot')).squeeze()[1:]
-        theta_dot_pred = self.mpc.data.prediction(('_x', 'theta_dot')).squeeze()[1:]
-
-        # make predictions array of shape (horizon, 4)
-        predictions = np.vstack([x_pred, theta_pred, x_dot_pred, theta_dot_pred]).T
-
-        return trajectory, predictions
+        return trajectory
 
 class SamplingController:
-    def __init__(self, controller='predictive',horizon=10, dt=0.02, linear=False, recompute_every=1, model_length=1.0, wind_mu=0.0, wind_sigma=0.0):
+    def __init__(self, controller='predictive',horizon=10, dt=0.02, linear=False, recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0, action_space="continuous"):
+        self.action_space = action_space
         self.horizon = horizon
         self.dt = dt
         self.linear = linear
@@ -173,7 +116,7 @@ class SamplingController:
         self.n_candidate_trajectories = 200
         actions = np.zeros([self.n_candidate_trajectories, self.horizon, 1])
         
-        if self.control_model == 'predictive':
+        if self.control_model=='predictive':
             # Shift nominal trajectory
             if self.horizon > 1:
                 self.nominal_trajectory = np.vstack([
@@ -185,74 +128,65 @@ class SamplingController:
             
             # Add noise for other candidates
             if self.n_candidate_trajectories > 1:
-                noise_std = 0.1 * (env.action_space.high - env.action_space.low)
+                noise_std = 0.1 * (6) # env.action_space.high - env.action_space.low
                 for i in range(1, self.n_candidate_trajectories):
                     noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
                     actions[i] = np.clip(
                         self.nominal_trajectory + noise,
-                        env.action_space.low, env.action_space.high
+                        -3.0, 3.0 #  env.action_space.low,env.action_space.high
                     )
         
         elif self.control_model == 'random':
             # Random shooting
-            actions = np.random.uniform(
-                low=env.action_space.low,
-                high=env.action_space.high,
-                size=(self.n_candidate_trajectories, self.horizon, 1))
+            if self.action_space == 'discrete':
+                actions = np.random.choice(
+                    [0, 1], 
+                    size=(self.n_candidate_trajectories, self.horizon, 1)
+                )
+            elif self.action_space == 'continuous':
+                actions = np.random.uniform(
+                    low=env.action_space.low,
+                    high=env.action_space.high,
+                    size=(self.n_candidate_trajectories, self.horizon, 1)
+                )
 
         return actions
     
-    def calculate_trajectories(self, env, initial_obs, actions):
-        """
-        Ttrajectory evaluation using Euler integration.
-        
-        Args:
-            env: Environment (for compatibility, not used in vectorized version)
-            initial_obs: Initial state (4,)
-            actions: Action trajectories (n_traj, horizon, 1)
-            
-        Returns:
-            observations: (n_traj, horizon, 4)
-            discrete_rewards: (n_traj, horizon) - zeros for compatibility
-            done_flags: (n_traj, horizon) - zeros for compatibility
-        """
+    def evaluate_trajectories(self, env, initial_obs, actions):
+        """Evaluate all action trajectories."""
+        observations = np.zeros([self.n_candidate_trajectories, self.horizon, *env.observation_space.shape])
+        discrete_rewards = np.zeros([self.n_candidate_trajectories, self.horizon])
+        done_flags = np.zeros([self.n_candidate_trajectories, self.horizon], dtype=bool)
+
         # Save the current state
-        saved_qpos = env.unwrapped.data.qpos.copy()
-        saved_qvel = env.unwrapped.data.qvel.copy()   
+        if self.action_space == 'continuous':
+            saved_qpos = env.unwrapped.data.qpos.copy()
+            saved_qvel = env.unwrapped.data.qvel.copy()
+        elif self.action_space == 'discrete':
+            saved_state = env.unwrapped.state.copy()
+            saved_qpos = saved_state[[0, 2]] 
+            saved_qvel = saved_state[[1, 3]]  
+        
 
-        # Initialize output arrays
-        observations = np.zeros([self.n_candidate_trajectories, self.horizon, env.observation_space.shape[0]])
-
-        # Loop over trajectories
         for i in range(self.n_candidate_trajectories):
             self.restore_state(env, saved_qpos, saved_qvel)
-            current_state = initial_obs
 
-            # Simulate forward in time
+            if self.action_space == 'discrete':
+                env.unwrapped.length = self.length * env.unwrapped.length
+            elif self.action_space == 'continuous':
+                env.unwrapped.model.geom('cpole').size[1] = self.length * env.unwrapped.model.geom('cpole').size[1]
+
             for step in range(self.horizon):
-                # Get actions for this time step - shape: (n_traj,)
-                action = actions[i, step, 0]
-                
-                # # Compute derivatives for all trajectories simultaneously
-                # derivatives = cartpole_dynamics(current_state, action, self.linear, self.length)
-                
-                # # Euler integration: x_{t+1} = x_t + dt * f(x_t, u_t)
-                # current_state = current_state + derivatives * self.dt
-
-                # # RK4 integration step
-                # current_state = rk4_step(current_state, action, self.dt, self.linear, self.length)
-
-                # True simulator from the environment
-                current_state, reward, done, truncated, info = env.step(np.array([action]))
-
-                next_obs_with_noise = current_state.copy()
-                wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma)
-                next_obs_with_noise[1] += wind_disturbance
+                action = actions[i, step]
+                    
+                next_obs, reward, done, truncated, info = env.step(action)
                 
                 actions[i, step] = action  # Store actual action used
-                observations[i, step] = next_obs_with_noise
-            
-        return observations
+                observations[i, step] = next_obs
+                discrete_rewards[i, step] = reward
+                done_flags[i, step] = done or truncated
+                        
+        return observations, discrete_rewards, done_flags
     
     def get_action(self, obs, env):
         """Handle trajectory-based methods (random, predictive)."""
@@ -263,68 +197,75 @@ class SamplingController:
                     self.nominal_trajectory = np.zeros((self.horizon, 1))       
         
         # Save the current state
-        saved_qpos = env.unwrapped.data.qpos.copy()
-        saved_qvel = env.unwrapped.data.qvel.copy()
+        if self.action_space == 'continuous':
+            saved_qpos = env.unwrapped.data.qpos.copy()
+            saved_qvel = env.unwrapped.data.qvel.copy()
+        elif self.action_space == 'discrete':
+            saved_state = env.unwrapped.state.copy()
+            saved_qpos = saved_state[[0, 2]] 
+            saved_qvel = saved_state[[1, 3]]  
 
         # Generate action trajectories
         actions = self.generate_action_trajectories(env, obs)
         
         # Evaluate trajectories
-        observations = self.calculate_trajectories(env, obs, actions)
+        observations, discrete_rewards, done_flags = self.evaluate_trajectories(env, obs, actions)
         
         # Calculate rewards and select best
-        cumulative_rewards = self.calculate_trajectory_rewards(env, actions, observations)
+        cumulative_rewards = self.calculate_trajectory_rewards(env, actions, observations, discrete_rewards, done_flags)
         
         # Restore state and return best trajectory
         self.restore_state(env, saved_qpos, saved_qvel)
         
         best_idx = np.argmax(cumulative_rewards)
         best_trajectory = actions[best_idx]
-
-        predicted_observations = observations[best_idx]
         
         # Update nominal trajectory for predictive methods
         self.nominal_trajectory = best_trajectory
-
-        return best_trajectory, predicted_observations
+        
+        return best_trajectory
     
     def restore_state(self, env, qpos, qvel):
         """Restore environment state."""
-        env.unwrapped.data.qpos[:] = qpos
-        env.unwrapped.data.qvel[:] = qvel
-        mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
+        if self.action_space == 'continuous':
+            env.unwrapped.data.qpos[:] = qpos
+            env.unwrapped.data.qvel[:] = qvel
+            mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
+        elif self.action_space == 'discrete':
+            # For CartPole-v1: reconstruct state from qpos and qvel
+            state = np.concatenate([qpos, qvel])  # [cart_pos, pole_angle, cart_vel, pole_angular_vel]
+            env.unwrapped.state = state
 
-    def calculate_trajectory_rewards(self, env, actions, obs):
-        reward = np.zeros((self.n_candidate_trajectories, self.horizon))
-        
-        # Match MPC objective exactly
-        stage_cost = (10 * obs[:, :, 1]**2 +     # 10*theta^2
-                    obs[:, :, 0]**2 +           # x^2  
-                    obs[:, :, 3]**2 +           # theta_dot^2
-                    obs[:, :, 2]**2)            # x_dot^2
-        
-        action_cost = 0.1 * actions[:, :, 0]**2   # Match MPC's rterm
-        
-        reward = -(stage_cost + action_cost)  # Negative because we maximize reward
-        
+    def calculate_trajectory_rewards(self, env, actions, observations, discrete_rewards, done_flags):
+        """Calculate rewards for trajectories."""
+
+        # Your simple quadratic reward function
+        x = observations[:, :, 0]        # cart position
+        theta = observations[:, :, 2]    # pole angle  
+        x_dot = observations[:, :, 1]    # cart velocity
+        theta_dot = observations[:, :, 3] # pole angular velocity
+                
+        # Quadratic costs (matching MPC cost matrices)
+        position_cost = x**2
+        angle_cost = 10.0 * theta**2
+        velocity_cost = 0.1 * (x_dot**2 + theta_dot**2)
+                
+        total_cost = position_cost + angle_cost + velocity_cost
+        reward = -total_cost
+                
         return reward.sum(axis=1)
 
-def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, results_folder="../results/PerformanceResults/", 
+def evaluate_mpc_controllers(controller, horizons, recompute_intervals, results_folder="../results/PerformanceResults/", 
                              episode_length=500, num_episodes=20, seed=42, linear=True, 
-                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0]):
+                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0],action_space='discrete'):
     """Evaluate MPC with various parameters and save each configuration separately."""
+    
+    true_length = 0.5
     
     if min(recompute_intervals) > min(horizons):
         raise ValueError("The smallest recompute interval must be less than or equal to the smallest horizon.")
     
     os.makedirs(results_folder, exist_ok=True)
-
-    # Get the pole lenght from the environment
-    env = gym.make("InvertedPendulum-v5", render_mode=None, reset_noise_scale=0.00)
-    env.unwrapped.model.opt.timestep = dt
-    mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
-    env.reset() 
-    true_length = env.unwrapped.model.geom('cpole').size[1]
     
     overall_timing = []
     
@@ -334,19 +275,18 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
                 for h in horizons:
                     for e in recompute_intervals:
                         for ratio in length_ratios:
-                            # change the pole length in simulation
-                            model_length = ratio * true_length
+                            model_length = true_length * ratio
                             start_time = time.time()
                             
                             if controller == 'mpc':
                                 mpc = MPCController(horizon=h, recompute_every=e, linear=linear, 
-                                                model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
+                                                model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma, action_space=action_space)
                             elif controller == 'predictive':
                                 mpc = SamplingController(controller=controller,horizon=h, recompute_every=e, linear=linear, 
-                                                model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
+                                                model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma, action_space=action_space)
                             elif controller == 'random':
                                 mpc = SamplingController(controller=controller,horizon=h, recompute_every=e, linear=linear, 
-                                                model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
+                                                model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma, action_space=action_space)
 
 
                             episode_lengths = []
@@ -355,14 +295,17 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
                             
                             for ep in range(num_episodes):
                                 episode_start_time = time.time()
-
-                                env = gym.make("InvertedPendulum-v5", render_mode=None, reset_noise_scale=0.00)
-                                env.unwrapped.model.opt.timestep = dt
-                                mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
-                                env.reset() 
+                                                              
+                                if action_space == 'discrete':
+                                    env = gym.make("CartPole-v1", render_mode=None)
+                                elif action_space == 'continuous':
+                                    env = gym.make("InvertedPendulum-v5", render_mode=None, reset_noise_scale=0.00)
                                         
                                 obs, _ = env.reset(seed=seed + ep, options={"low": init_angle-0.05, "high": init_angle+0.05})
                                 
+                                if action_space == 'continuous':
+                                    obs = np.array([obs[0], obs[2], obs[1], obs[3]])
+
                                 length, step = 0, 0
                                 done = False
                                 states = []
@@ -370,16 +313,26 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
                                 while not done and length < episode_length:
                                     if step % e == 0:
                                         within_step = 0
-                                        trajectory, predictions = mpc.get_action(obs, env)
-                                        trajectory = trajectory.flatten()
+                                        trajectory = mpc.get_action(obs,env).flatten()
                                     else:
                                         within_step += 1
                                     
                                     action = trajectory[within_step]
 
-                                    action = np.array([np.clip(action, -3.0, 3.0)]) 
+                                    if action_space == 'discrete':
+                                        if action > 0:
+                                            action = 1
+                                        else:
+                                            action = 0
+                                        
+
+                                    else:
+                                        action = np.array([np.clip(action, -3.0, 3.0)]) 
                                     
                                     obs, _, done, _, _ = env.step(action)
+                                    
+                                    if action_space == 'continuous':
+                                        obs = np.array([obs[0], obs[2], obs[1], obs[3]])
                                         
                                     states.append(obs)
                                     step += 1
@@ -410,7 +363,8 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
                                     'linear': linear,
                                     'episode_length': episode_length,
                                     'num_episodes': num_episodes,
-                                    'seed': seed
+                                    'seed': seed,
+                                    'action_space': action_space
                                 },
                                 'results': {
                                     'episode_lengths': episode_lengths,
@@ -427,7 +381,7 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
                                 }
                             }
 
-                            filename = f"mpc__cont{controller}_h{h}_e{e}_r{ratio:.1f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
+                            filename = f"mpc__cont{controller}_h{h}_e{e}_r{ratio:.1f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}_as{action_space}.pkl"
                             filepath = os.path.join(results_folder, filename)
                             
                             with open(filepath, 'wb') as f:
@@ -450,180 +404,6 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
     timing_df.to_csv(timing_path, index=False)
     
     return
-
-def calculate_cost_error(controller_type, true_state, predicted_state, action):
-    """Calculate cost prediction error."""
-    true_cost = 0.0
-    predicted_cost = 0.0
-
-    true_cost -= 10 * (true_state[1]**2) + true_state[0]**2
-    true_cost -= (true_state[2]**2 + true_state[3]**2)
-    true_cost -= 0.1 * (action**2)  
-
-    predicted_cost -= 10 * (predicted_state[1]**2) + predicted_state[0]**2
-    predicted_cost -= (predicted_state[2]**2 + predicted_state[3]**2)
-    predicted_cost -= 0.1 * (action**2)
-
-    cost_pe = abs(true_cost - predicted_cost)
-
-    return cost_pe
-
-def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02, linear=False, 
-                                 recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0,
-                                 episode_length=500, seed=42, init_angle=0.1):
-    """
-    Run a single episode with the specified controller and plot angle and actions over time.
-    
-    Parameters:
-    - controller_type: 'mpc', 'predictive', or 'random'
-    - Other parameters same as controller constructors
-    """
-
-    # Get the pole lenght from the environment
-    env = gym.make("InvertedPendulum-v5", render_mode=None, reset_noise_scale=0.00)
-    env.unwrapped.model.opt.timestep = dt
-    mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
-    env.reset() 
-    true_length = env.unwrapped.model.geom('cpole').size[1]
-    model_length = model_length * true_length
-    
-    # Initialize the controller
-    if controller_type == 'mpc':
-        controller = MPCController(horizon=horizon, dt=dt, linear=linear, 
-                                 recompute_every=recompute_every, model_length=model_length, 
-                                 wind_mu=wind_mu, wind_sigma=wind_sigma)
-    elif controller_type in ['predictive', 'random']:
-        controller = SamplingController(controller=controller_type, horizon=horizon, dt=dt, 
-                                      linear=linear, recompute_every=recompute_every, 
-                                      model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
-    else:
-        raise ValueError("controller_type must be 'mpc', 'predictive', or 'random'")
-    
-    # Initialize environment
-    env = gym.make("InvertedPendulum-v5", render_mode=None, reset_noise_scale=0.00)
-    env.unwrapped.model.opt.timestep = dt
-    mujoco.mj_forward(env.unwrapped.model, env.unwrapped.data)
-    env.reset() 
-    obs, _ = env.reset(seed=seed, options={"low": init_angle-0.05, "high": init_angle+0.05})
-    
-    # Storage for plotting
-    angles = []
-    actions_taken = []
-    cart_positions = []
-    time_steps = []
-    prediction_errors = []
-    cost_prediction_errors = []
-    
-    length, step = 0, 0
-    done = False
-    
-    print(f"Running episode with {controller_type} controller...")
-    
-    while length < episode_length:
-        # Get action from controller
-        within_step = 0
-        if step % recompute_every == 0:
-            within_step = 0
-            trajectory, all_predictions = controller.get_action(obs, env)
-            trajectory = trajectory.flatten()
-
-        else:
-            within_step += 1
-
-        action = trajectory[within_step]
-        predictions = all_predictions[within_step]
-
-        action = np.array([np.clip(action, -3.0, 3.0)])
-        
-        # Store data for plotting
-        time_steps.append(length * dt)  # Convert to time in seconds
-        
-        # Based on the observation order: [cart_position, angle, cart_velocity, angular_velocity]
-        cart_positions.append(obs[0])  # cart position
-        angles.append(obs[1])          # angle
-        actions_taken.append(action[0])
-        
-        # Step environment
-        obs, _, done, _, _ = env.step(action)
-        prediction_errors.append(obs - predictions)
-        step += 1
-        length += 1
-
-        cost_prediction_error = calculate_cost_error(controller_type,obs, predictions, action)
-        cost_prediction_errors.append(cost_prediction_error[0])
-
-        print(f"Step {step}, Time {length*dt:.2f}s, Angle {obs[1]:.4f} rad, Cart Pos {obs[0]:.4f} m, Action {action[0]:.4f}, PE_x {(obs - predictions)[0]:.4f}, PE_theta {(obs - predictions)[1]:.4f}, PE_xdot {(obs - predictions)[2]:.4f}, PE_thetadot {(obs - predictions)[3]:.4f}, Cost PE {cost_prediction_error[0]:.10f}")
-
-    
-    env.close()
-    
-    # Convert to numpy arrays for easier plotting
-    time_steps = np.array(time_steps)
-    angles = np.array(angles)
-    actions_taken = np.array(actions_taken)
-    cart_positions = np.array(cart_positions)
-    prediction_errors = np.array(prediction_errors).T  
-    
-    # Create plots
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(8, 8))
-    
-    # Plot 1: Angle over time
-    ax1.plot(time_steps, angles, 'b-', linewidth=2, label='Pole Angle')
-    ax1.axhline(y=0, color='r', linestyle='--', alpha=0.5, label='Target (0 rad)')
-    ax1.set_xlabel('Time (seconds)')
-    ax1.set_ylabel('Angle (radians)')
-    ax1.set_title(f'Pole Angle Over Time - {controller_type.upper()} Controller\n'
-                  f'H={horizon}, Recompute={recompute_every}, Length={model_length:.2f}')
-    ax1.grid(True, alpha=0.3)
-    ax1.legend()
-
-    # Add y lims
-    ax1.set_ylim([-1.7, 1.7])
-    
-    # Add angle bounds if desired (typical cart-pole fails around ±0.2 radians)
-    ax1.axhline(y=1.57, color='r', linestyle=':', alpha=0.3, label='Floor Limits')
-    ax1.axhline(y=-1.57, color='r', linestyle=':', alpha=0.3)
-    
-    # Plot 2: Actions over time
-    ax2.plot(time_steps, actions_taken, 'g-', linewidth=2, label='Control Action')
-    ax2.axhline(y=0, color='k', linestyle='--', alpha=0.5, label='No Force')
-    ax2.axhline(y=3.0, color='r', linestyle=':', alpha=0.5, label='Force Limits')
-    ax2.axhline(y=-3.0, color='r', linestyle=':', alpha=0.5)
-    ax2.set_xlabel('Time (seconds)')
-    ax2.set_ylabel('Force (N)')
-    ax2.set_title('Control Actions Over Time')
-    ax2.grid(True, alpha=0.3)
-    ax2.legend()
-    ax2.set_ylim([-3.5, 3.5])
-
-    # Plot 3: prediction errors - 4 lines of different colors
-    # Define colors and labels for the 4 state variables
-    colors = ['b', 'g', 'orange', 'purple']
-    labels = ['x (cart position)', 'θ (pole angle)', 'ẋ (cart velocity)', 'θ̇ (angular velocity)']
-    
-    for i in range(4):
-        ax3.plot(time_steps, prediction_errors[i], color=colors[i], label=labels[i], linewidth=2)
-    
-    ax3.set_xlabel('Time (seconds)')
-    ax3.set_ylabel('Prediction Error')
-    ax3.set_title('Prediction Errors Over Time')
-    ax3.grid(True, alpha=0.3)
-    ax3.legend()
-
-    # Plot 4: cost prediction error over time
-    ax4.plot(time_steps, cost_prediction_errors, 'm-', linewidth=2, label='Cost Prediction Error')
-    ax4.set_xlabel('Time (seconds)')
-    ax4.set_ylabel('Cost Prediction Error')
-    ax4.set_title('Cost Prediction Error Over Time')
-    ax4.grid(True, alpha=0.3)
-    ax4.legend()
-
-    plt.tight_layout()
-    plt.show()
-
-       
-    # Return data for further analysis if needed
-    return predictions
 
 def load_results_data(results_folder="../results/PerformanceResults/"):
     """Load all pickle files and return combined DataFrame."""
@@ -655,7 +435,8 @@ def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/",
                                 wind_sigma=0.0,
                                 init_angle=0.0,
                                 num_episodes=20,
-                                dt=0.02):
+                                dt=0.02,
+                                action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each pole error ratio."""
     
     df = load_results_data(results_folder)
@@ -668,11 +449,12 @@ def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/",
         (df['controller'] == controller) &
         (df['wind_mu'] == wind_mu) & 
         (df['wind_sigma'] == wind_sigma) &
-        (df['init_angle'] == init_angle)
+        (df['init_angle'] == init_angle) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
-        print(f"No data found for controller {controller}, wind_mu={wind_mu}, wind_sigma={wind_sigma}, init_angle={init_angle}")
+        print(f"No data found for controller {controller}, wind_mu={wind_mu}, wind_sigma={wind_sigma}, init_angle={init_angle}, action_space={action_space}")
         return
     
     horizons = sorted(filtered_data['horizon'].unique())
@@ -738,11 +520,11 @@ def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Pole Length Error\n(controller={controller}, wind_μ={wind_mu}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Pole Length Error\n(controller={controller}, wind_μ={wind_mu}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_4d_performance_heatmaps_wmu{wind_mu}_wsig{wind_sigma}_iang{init_angle:.2f}.png")
+    save_path = os.path.join(results_folder, f"mpc_4d_performance_heatmaps_wmu{wind_mu}_wsig{wind_sigma}_iang{init_angle:.2f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
@@ -755,7 +537,8 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
                          wind_sigma=0.0,
                          init_angle=0.0,
                          num_episodes=20,
-                         dt=0.02):
+                         dt=0.02,
+                         action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each wind_mu level."""
     
     df = load_results_data(results_folder)
@@ -768,11 +551,12 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
         (df['controller'] == controller) &
         (df['length_ratio'] == length_ratio) & 
         (df['wind_sigma'] == wind_sigma) &
-        (df['init_angle'] == init_angle)
+        (df['init_angle'] == init_angle) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
-        print(f"No data found for ratio={length_ratio}, sigma={wind_sigma}, init_angle={init_angle}")
+        print(f"No data found for ratio={length_ratio}, sigma={wind_sigma}, init_angle={init_angle}, action_space={action_space}")
         return
     
     horizons = sorted(filtered_data['horizon'].unique())
@@ -831,11 +615,11 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Mean\n(controller={controller}, length_ratio={length_ratio}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Mean\n(controller={controller}, length_ratio={length_ratio}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_wind_mu_heatmaps_r{length_ratio:.1f}_s{wind_sigma:.1f}_iang{init_angle:.2f}.png")
+    save_path = os.path.join(results_folder, f"mpc_wind_mu_heatmaps_r{length_ratio:.1f}_s{wind_sigma:.1f}_iang{init_angle:.2f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
@@ -849,7 +633,8 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
                             wind_mu=0.0,
                             init_angle=0.0,
                             num_episodes=20,
-                            dt=0.02):
+                            dt=0.02,
+                            action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each wind_sigma level."""
     
     df = load_results_data(results_folder)
@@ -862,11 +647,12 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
         (df['controller'] == controller) &
         (df['length_ratio'] == length_ratio) & 
         (df['wind_mu'] == wind_mu) &
-        (df['init_angle'] == init_angle)
+        (df['init_angle'] == init_angle) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
-        print(f"No data found for ratio={length_ratio}, mu={wind_mu}, init_angle={init_angle}")
+        print(f"No data found for ratio={length_ratio}, mu={wind_mu}, init_angle={init_angle}, action_space={action_space}")
         return
     
     horizons = sorted(filtered_data['horizon'].unique())
@@ -925,11 +711,11 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Std Dev\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Std Dev\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu}, init_angle={init_angle:.2f}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_wind_sigma_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_iang{init_angle:.2f}.png")
+    save_path = os.path.join(results_folder, f"mpc_wind_sigma_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_iang{init_angle:.2f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
@@ -943,7 +729,8 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
                                       wind_mu=0.0,
                                       wind_sigma=0.0,
                                       num_episodes=20,
-                                      dt=0.02):
+                                      dt=0.02,
+                                      action_space='discrete'):
     """Create multiple heatmaps showing horizon × recompute performance for each initial angle."""
     
     df = load_results_data(results_folder)
@@ -956,7 +743,8 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
         (df['controller'] == controller) &
         (df['length_ratio'] == length_ratio) & 
         (df['wind_mu'] == wind_mu) &
-        (df['wind_sigma'] == wind_sigma)
+        (df['wind_sigma'] == wind_sigma) &
+        (df['action_space'] == action_space)
     ]
     
     if filtered_data.empty:
@@ -1029,11 +817,11 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Initial Angle\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu}, wind_σ={wind_sigma}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Initial Angle\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu}, wind_σ={wind_sigma}, action_space={action_space}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    save_path = os.path.join(results_folder, f"mpc_init_angle_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_s{wind_sigma:.1f}.png")
+    save_path = os.path.join(results_folder, f"mpc_init_angle_heatmaps_r{length_ratio:.1f}_m{wind_mu:.1f}_s{wind_sigma:.1f}_as{action_space}.png")
     plt.savefig(save_path, bbox_inches="tight", dpi=300)
     print(f"\nPlot saved to: {save_path}")
     plt.show()
