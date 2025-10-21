@@ -42,6 +42,7 @@ mpc_results = evaluate_mpc_controllers(
         controller='predictive',
         horizons=[20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
         recompute_intervals=[recompute_interval],
+        dt = 0.02,
         length_ratios=[length_ratio],
         wind_mus=[wind_mu],
         wind_sigmas=[0.0],
