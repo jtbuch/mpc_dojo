@@ -54,7 +54,7 @@ class MPCController:
         self.horizon = horizon
         self.dt = dt
         self.recompute_every = recompute_every
-        self.force_mag = 3.0
+        self.force_mag = 10.0
         self.gravity = 9.8  
         self.masscart = 1.0
         self.masspole = 0.1
@@ -148,7 +148,7 @@ class SamplingController:
         self.wind_mu = wind_mu
         self.wind_sigma = wind_sigma
 
-        self.force_mag = 3.0
+        self.force_mag = 10.0
         self.gravity = 9.81
         self.masscart = 1.0
         self.masspole = 0.1
@@ -170,20 +170,35 @@ class SamplingController:
             
             # Add noise for other candidates
             if self.n_candidate_trajectories > 1:
-                noise_std = 0.6
-                for i in range(1, self.n_candidate_trajectories):
-                    noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
-                    actions[i] = np.clip(
-                        self.nominal_trajectory + noise,
-                        -3.0, 3.0
-                    )
+
+                # Generate all random actions at once
+                actions[1:] = np.random.choice(
+                    [-self.force_mag, self.force_mag],
+                    size=(self.n_candidate_trajectories - 1, self.horizon, 1)
+                )
+    
+                # noise_std = 2.0
+                # for i in range(1, self.n_candidate_trajectories):
+                #     # noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
+                #     # actions[i] = np.clip(
+                #     #     self.nominal_trajectory + noise,
+                #     #     -self.force_mag, self.force_mag
+                #     # )
+  
         
         elif self.control_model == 'random':
             # Random shooting
-            actions = np.random.uniform(
-                low=-3.0,
-                high=3.0,
-                size=(self.n_candidate_trajectories, self.horizon, 1))
+            # actions = np.random.uniform(
+            #     low=-self.force_mag,
+            #     high=self.force_mag,
+            #     size=(self.n_candidate_trajectories, self.horizon, 1))
+            # randomly sample from two options -self.force_mag and +self.force_mag
+            actions = np.random.choice(
+                [-self.force_mag, self.force_mag],
+                size=(self.n_candidate_trajectories, self.horizon, 1)
+            )
+        # Discretize actions to -10 or +10
+        actions = np.where(actions >= 0, self.force_mag, -self.force_mag)
 
         return actions
     
@@ -221,8 +236,6 @@ class SamplingController:
                 # Euler integration: x_{t+1} = x_t + dt * f(x_t, u_t)
                 current_state = current_state + derivatives * self.dt
 
-                current_state = self.clip_to_env_bounds(current_state, env)
-
                 next_obs_with_noise = current_state.copy()
                 wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma)
                 next_obs_with_noise[2] += wind_disturbance
@@ -230,25 +243,6 @@ class SamplingController:
                 observations[i, step] = next_obs_with_noise
             
         return observations
-    
-    def clip_to_env_bounds(self, obs, env):
-        """Clip observations to environment's observation space"""
-        clipped_obs = obs.copy()
-        
-        # Get environment bounds
-        low = env.observation_space.low
-        high = env.observation_space.high
-        
-        # Only clip finite bounds (not -inf/+inf)
-        for i in range(len(obs)):
-            if np.isfinite(low[i]) and np.isfinite(high[i]):
-                clipped_obs[i] = np.clip(obs[i], low[i], high[i])
-            elif np.isfinite(low[i]):
-                clipped_obs[i] = np.maximum(obs[i], low[i])
-            elif np.isfinite(high[i]):
-                clipped_obs[i] = np.minimum(obs[i], high[i])
-        
-        return clipped_obs
     
     def get_action(self, obs, env):
         """Handle trajectory-based methods (random, predictive)."""
@@ -480,13 +474,6 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
         controller = SamplingController(controller=controller_type, horizon=horizon, dt=dt, 
                                       recompute_every=recompute_every, 
                                       model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
-    elif controller_type == 'rnn_mpc':
-        # Load model
-        model, info = load_rnn_model(checkpoint=5)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = model.to(device)
-        controller = RNNMPCController(horizon=horizon, dt=dt, 
-                                       model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
     else:
         raise ValueError("controller_type must be 'mpc', 'predictive', or 'random'")
     
@@ -509,7 +496,7 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
     trajectory = None
     all_predictions = None
     
-    while length < episode_length:# and not done:  
+    while length < episode_length and not done:  
         # Get action from controller
         # if step % recompute_every == 0:
         if step % recompute_every == 0:
@@ -554,15 +541,15 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
     actions_taken = np.array(actions_taken)
     cart_positions = np.array(cart_positions)
     prediction_errors = np.array(prediction_errors).T  
-    
+
     # Create plots
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(8, 9))
+    fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(8, 10))
     
     # Plot 1: Angle over time
-    ax1.plot(time_steps, np.rad2deg(angles), 'b-', linewidth=2, label='Pole Angle')
-    ax1.axhline(y=0, color='r', linestyle='--', alpha=0.5, label='Target (0°)')
-    ax1.axhline(y=24, color='r', linestyle=':', alpha=0.3, label='Failure Limits')
-    ax1.axhline(y=-24, color='r', linestyle=':', alpha=0.3)
+    ax1.plot(time_steps, angles, 'b-', linewidth=2, label='Pole Angle (radians)')
+    ax1.axhline(y=0, color='r', linestyle='--', alpha=0.5, label='Target (0)')
+    ax1.axhline(y=-0.2095, color='r', linestyle=':', alpha=0.3, label='Failure Limits')
+    ax1.axhline(y=0.2095, color='r', linestyle=':', alpha=0.3)
     ax1.set_xlabel('Time (seconds)')
     ax1.set_ylabel('Angle (degrees)')
     ax1.set_title(f'Pole Angle Over Time - {controller_type.upper()} Controller\n'
@@ -570,46 +557,57 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
                   f'Wind σ={wind_sigma:.2f}')
     ax1.grid(True, alpha=0.3)
     ax1.legend()
-    ax1.set_ylim([-30, 30])
-    
-    # Plot 2: Actions over time
-    ax2.plot(time_steps, actions_taken, 'g-', linewidth=2, label='Control Action')
-    ax2.axhline(y=0, color='k', linestyle='--', alpha=0.5, label='No Force')
-    ax2.axhline(y=3.0, color='r', linestyle=':', alpha=0.5, label='Force Limits')
-    ax2.axhline(y=-3.0, color='r', linestyle=':', alpha=0.5)
+    ax1.set_ylim([-0.45, 0.45])
+
+    # Plot cart position over time
+    ax2.plot(time_steps, cart_positions, 'm-', linewidth=2, label='Cart Position')
+    ax2.axhline(y=0, color='k', linestyle='--', alpha=0.5, label='Center Position')
+    ax2.axhline(y=2.4, color='r', linestyle=':', alpha=0.3, label='Failiure Limits')
+    ax2.axhline(y=-2.4, color='r', linestyle=':', alpha=0.3)
     ax2.set_xlabel('Time (seconds)')
-    ax2.set_ylabel('Force (N)')
-    ax2.set_title('Control Actions Over Time')
+    ax2.set_ylabel('Position (m)')
+    ax2.set_title('Cart Position Over Time')
     ax2.grid(True, alpha=0.3)
     ax2.legend()
-    ax2.set_ylim([-4, 4])
+    ax2.set_ylim([-4.8, 4.8])
+    
+    # Plot 2: Actions over time
+    ax3.plot(time_steps, actions_taken, 'g-', linewidth=2, label='Control Action')
+    ax3.axhline(y=0, color='k', linestyle='--', alpha=0.5, label='No Force')
+    ax3.axhline(y=10.0, color='r', linestyle=':', alpha=0.5, label='Force Limits')
+    ax3.axhline(y=-10.0, color='r', linestyle=':', alpha=0.5)
+    ax3.set_xlabel('Time (seconds)')
+    ax3.set_ylabel('Force (N)')
+    ax3.set_title('Control Actions Over Time')
+    ax3.grid(True, alpha=0.3)
+    ax3.legend()
+    ax3.set_ylim([-12, 12])
 
     # Plot 3: prediction errors
     colors = ['b', 'g', 'orange', 'purple']
     labels = ['x (cart position)', 'ẋ (cart velocity)', 'θ (pole angle)', 'θ̇ (angular velocity)']
     
     for i in range(4):
-        ax3.plot(time_steps, prediction_errors[i], color=colors[i], label=labels[i], linewidth=2)
-    
-    ax3.set_xlabel('Time (seconds)')
-    ax3.set_ylabel('Prediction Error')
-    ax3.set_title('Prediction Errors Over Time')
-    ax3.grid(True, alpha=0.3)
-    ax3.legend()
+        ax4.plot(time_steps, prediction_errors[i], color=colors[i], label=labels[i], linewidth=2)
 
-    # Plot 4: cost prediction error
-    ax4.plot(time_steps, cost_prediction_errors, 'm-', linewidth=2, label='Cost Prediction Error')
     ax4.set_xlabel('Time (seconds)')
-    ax4.set_ylabel('Cost Prediction Error')
-    ax4.set_title('Cost Prediction Error Over Time')
+    ax4.set_ylabel('Prediction Error')
+    ax4.set_title('Prediction Errors Over Time')
     ax4.grid(True, alpha=0.3)
     ax4.legend()
+
+    # Plot 4: cost prediction error
+    ax5.plot(time_steps, cost_prediction_errors, 'm-', linewidth=2, label='Cost Prediction Error')
+    ax5.set_xlabel('Time (seconds)')
+    ax5.set_ylabel('Cost Prediction Error')
+    ax5.set_title('Cost Prediction Error Over Time')
+    ax5.grid(True, alpha=0.3)
+    ax5.legend()
 
     plt.tight_layout()
     plt.savefig('mpc_cartpole_results.png', dpi=150)
     plt.show()
        
-    return prediction_errors
 
 def load_results_data(results_folder="../results/PerformanceResults/"):
     """Load all pickle files and return combined DataFrame."""
