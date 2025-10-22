@@ -10,6 +10,7 @@ import pickle
 import mujoco
 from scipy.integrate import solve_ivp
 from casadi import cos, sin  
+import torch
 
 def cartpole_dynamics(self, state, action, model_length=1.0):
     """Works with both symbolic and numeric inputs"""
@@ -479,6 +480,13 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
         controller = SamplingController(controller=controller_type, horizon=horizon, dt=dt, 
                                       recompute_every=recompute_every, 
                                       model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
+    elif controller_type == 'rnn_mpc':
+        # Load model
+        model, info = load_rnn_model(checkpoint=5)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = model.to(device)
+        controller = RNNMPCController(horizon=horizon, dt=dt, 
+                                       model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
     else:
         raise ValueError("controller_type must be 'mpc', 'predictive', or 'random'")
     
@@ -501,8 +509,9 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
     trajectory = None
     all_predictions = None
     
-    while length < episode_length and not done:  # FIX: Stop if done
+    while length < episode_length:# and not done:  
         # Get action from controller
+        # if step % recompute_every == 0:
         if step % recompute_every == 0:
             within_step = 0
             trajectory, all_predictions = controller.get_action(obs, env)
@@ -547,7 +556,7 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
     prediction_errors = np.array(prediction_errors).T  
     
     # Create plots
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 10))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(8, 9))
     
     # Plot 1: Angle over time
     ax1.plot(time_steps, np.rad2deg(angles), 'b-', linewidth=2, label='Pole Angle')
