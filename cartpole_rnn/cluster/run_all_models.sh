@@ -14,19 +14,42 @@
 declare -a length_ratios=(1.0 2.0 3.0 4.0)
 declare -a recompute_intervals=(1 2 3 4 5 6 7 8 9)
 declare -a wind_mus=(0.0 0.05 0.1 0.15)
+declare -a wind_sigmas=(0.0 0.05 0.1 0.15)
 
-# Loop over all combinations and submit jobs
+# Loop 1: length_ratio and recompute_interval combinations (wind_mu and wind_sigma fixed at first element)
 for length_ratio in "${length_ratios[@]}"; do
     for recompute_interval in "${recompute_intervals[@]}"; do
-        for wind_mu in "${wind_mus[@]}"; do
-            sbatch \
-                --job-name="MPC_len${length_ratio}_recompute${recompute_interval}_wind${wind_mu}" \
-                --account=carney-ashenhav-condo \
-                --time=80:00:00 \
-                --mem=40G \
-                --nodes=1 \
-                -o "log/MPC_len${length_ratio}_recompute${recompute_interval}_wind${wind_mu}.%j.out" \
-                run_one_model.sh "$length_ratio" "$recompute_interval" "$wind_mu"
-        done
+        sbatch \
+            --job-name="MPC_len${length_ratio}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigmas[0]}" \
+            --account=carney-ashenhav-condo \
+            --time=80:00:00 \
+            --mem=40G \
+            --nodes=1 \
+            -o "log/MPC_len${length_ratio}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigmas[0]}.%j.out" \
+            run_one_model.sh "$length_ratio" "$recompute_interval" "${wind_mus[0]}" "${wind_sigmas[0]}"
     done
+done
+
+# Loop 2: wind_mu values (length_ratio, recompute_interval, and wind_sigma fixed at first element)
+for wind_mu in "${wind_mus[@]}"; do
+    sbatch \
+        --job-name="MPC_len${length_ratios[0]}_recompute${recompute_intervals[0]}_windmu${wind_mu}_windsigma${wind_sigmas[0]}" \
+        --account=carney-ashenhav-condo \
+        --time=80:00:00 \
+        --mem=40G \
+        --nodes=1 \
+        -o "log/MPC_len${length_ratios[0]}_recompute${recompute_intervals[0]}_windmu${wind_mu}_windsigma${wind_sigmas[0]}.%j.out" \
+        run_one_model.sh "${length_ratios[0]}" "${recompute_intervals[0]}" "$wind_mu" "${wind_sigmas[0]}"
+done
+
+# Loop 3: wind_sigma values (length_ratio, recompute_interval, and wind_mu fixed at first element)
+for wind_sigma in "${wind_sigmas[@]}"; do
+    sbatch \
+        --job-name="MPC_len${length_ratios[0]}_recompute${recompute_intervals[0]}_windmu${wind_mus[0]}_windsigma${wind_sigma}" \
+        --account=carney-ashenhav-condo \
+        --time=80:00:00 \
+        --mem=40G \
+        --nodes=1 \
+        -o "log/MPC_len${length_ratios[0]}_recompute${recompute_intervals[0]}_windmu${wind_mus[0]}_windsigma${wind_sigma}.%j.out" \
+        run_one_model.sh "${length_ratios[0]}" "${recompute_intervals[0]}" "${wind_mus[0]}" "$wind_sigma"   
 done

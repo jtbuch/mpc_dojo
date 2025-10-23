@@ -20,8 +20,9 @@ import time
 length_ratio = float(sys.argv[1])
 recompute_interval = int(sys.argv[2])
 wind_mu = float(sys.argv[3])
+wind_sigma = float(sys.argv[4])
 
-print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval}")
+print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval} and wind_mu={wind_mu} and wind_sigma={wind_sigma}")
 
 # Create 'Results' folder if it doesn't exist
 results_folder = "../results/PerformanceResults/"
@@ -45,7 +46,7 @@ mpc_results = evaluate_mpc_controllers(
         dt = 0.02,
         length_ratios=[length_ratio],
         wind_mus=[wind_mu],
-        wind_sigmas=[0.0],
+        wind_sigmas=[wind_sigma],
         results_folder="../results/PerformanceResults/",
         episode_length=1000,
         num_episodes=2,

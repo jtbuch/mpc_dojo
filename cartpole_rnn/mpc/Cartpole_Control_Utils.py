@@ -804,7 +804,7 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
         if idx == 0:
             axes[idx].set_ylabel('Recompute Every (s)', fontsize=11)
         
-        title = f'Wind μ = {wind_mu:.1f}'
+        title = f'Wind μ = {wind_mu:.2f}'
         axes[idx].set_title(title, fontsize=12, fontweight='bold')
         
         for i in range(len(recomputes)):
@@ -815,7 +815,7 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Mean\n(controller={controller}, length_ratio={length_ratio}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Mean\n(controller={controller}, length_ratio={length_ratio}, wind_σ={wind_sigma:.2f}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
@@ -898,7 +898,7 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
         if idx == 0:
             axes[idx].set_ylabel('Recompute Every (s)', fontsize=11)
         
-        title = f'Wind σ = {wind_sigma:.1f}'
+        title = f'Wind σ = {wind_sigma:.2f}'
         axes[idx].set_title(title, fontsize=12, fontweight='bold')
         
         for i in range(len(recomputes)):
@@ -909,7 +909,7 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Std Dev\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Wind Std Dev\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu:.2f}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
@@ -1013,7 +1013,7 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
                                   ha="center", va="center", 
                                   color=text_color, fontsize=9, fontweight='bold')
 
-    fig.suptitle(f'MPC Performance: Horizon × Recompute × Initial Angle\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu}, wind_σ={wind_sigma}, N={num_episodes} episodes)', 
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Initial Angle\n(controller={controller}, length_ratio={length_ratio}, wind_μ={wind_mu:.2f}, wind_σ={wind_sigma:.2f}, N={num_episodes} episodes)', 
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()

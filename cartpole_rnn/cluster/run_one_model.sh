@@ -5,4 +5,4 @@ module load anaconda
 source activate shitty_bird_env
 
 # Run the Python script with the provided parameters
-python ../mpc/run.py "$1" "$2" "$3"
+python ../mpc/run.py "$1" "$2" "$3" "$4"
