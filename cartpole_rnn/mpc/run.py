@@ -50,6 +50,6 @@ mpc_results = evaluate_mpc_controllers(
         results_folder="../results/PerformanceResults/",
         episode_length=3000,
         num_episodes=10,
-        init_angles=[0.0])
+        init_angles=[0.0, 0.05, 0.10, 0.15])
 
 

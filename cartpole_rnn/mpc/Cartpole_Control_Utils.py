@@ -337,6 +337,12 @@ def evaluate_mpc_controllers(controller, horizons, recompute_intervals, dt, resu
                                 env.unwrapped.tau = dt
                                         
                                 obs, _ = env.reset(seed=seed + ep)
+
+                                # Change the initial angle
+                                new_state = obs.copy()
+                                new_state[2] += init_angle
+                                env.unwrapped.state = new_state
+                                obs = new_state
                                 
                                 length, step = 0, 0
                                 done = False
@@ -450,7 +456,7 @@ def calculate_cost_error(controller_type, true_state, predicted_state, action):
 
 def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02, 
                                  recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0,
-                                 episode_length=500, seed=42, init_angle=0.1):
+                                 episode_length=500, seed=42, init_angle=0.0):
     """
     Run a single episode with the specified controller and plot angle and actions over time.
     """
@@ -481,6 +487,12 @@ def run_single_episode_with_plots(controller_type='mpc', horizon=10, dt=0.02,
     env = gym.make("CartPole-v1", render_mode=None)
     env.unwrapped.tau = dt  
     obs, _ = env.reset(seed=seed)
+
+    # Change the initial angle
+    new_state = obs.copy()
+    new_state[2] += init_angle
+    env.unwrapped.state = new_state
+    obs = new_state
     
     # Storage for plotting
     angles = []
