@@ -684,7 +684,7 @@ def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/",
     print(f"Found data for recompute intervals: {recomputes} steps = {[f'{r:.2f}s' for r in recomputes_sec]}")
     print(f"Plotting ratios: {plot_ratios}")
     
-    fig, axes = plt.subplots(1, len(plot_ratios)+4, figsize=(4*len(plot_ratios)+4, 5))
+    fig, axes = plt.subplots(1, len(plot_ratios), figsize=(4*len(plot_ratios)+4, 7))
     
     if len(plot_ratios) == 1:
         axes = [axes]
@@ -784,7 +784,7 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
     print(f"Found data for recompute intervals: {recomputes} steps = {[f'{r:.2f}s' for r in recomputes_sec]}")
     print(f"Plotting wind means: {plot_wind_mus}")
     
-    fig, axes = plt.subplots(1, len(plot_wind_mus)+4, figsize=(4*len(plot_wind_mus)+4, 5))
+    fig, axes = plt.subplots(1, len(plot_wind_mus), figsize=(4*len(plot_wind_mus)+4, 7))
     
     if len(plot_wind_mus) == 1:
         axes = [axes]
@@ -878,7 +878,7 @@ def plot_wind_sigma_heatmaps(results_folder="../results/PerformanceResults/",
     print(f"Found data for recompute intervals: {recomputes} steps = {[f'{r:.2f}s' for r in recomputes_sec]}")
     print(f"Plotting wind std devs: {plot_wind_sigmas}")
     
-    fig, axes = plt.subplots(1, len(plot_wind_sigmas)+4, figsize=(4*len(plot_wind_sigmas)+4, 5))
+    fig, axes = plt.subplots(1, len(plot_wind_sigmas), figsize=(4*len(plot_wind_sigmas)+4, 7))
     
     if len(plot_wind_sigmas) == 1:
         axes = [axes]
@@ -977,7 +977,7 @@ def plot_init_angle_heatmaps(results_folder="../results/PerformanceResults/",
     print(f"Found data for recompute intervals: {recomputes}")
     print(f"Plotting initial angles: {plot_init_angles}")
     
-    fig, axes = plt.subplots(1, len(plot_init_angles)+4, figsize=(4*len(plot_init_angles)+4, 5))
+    fig, axes = plt.subplots(1, len(plot_init_angles), figsize=(4*len(plot_init_angles)+4, 7))
     
     if len(plot_init_angles) == 1:
         axes = [axes]
