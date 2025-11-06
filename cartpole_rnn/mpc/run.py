@@ -22,6 +22,7 @@ recompute_interval = int(sys.argv[2])
 wind_mu = float(sys.argv[3])
 wind_sigma = float(sys.argv[4])
 world_model = sys.argv[5]
+controller = sys.argv[6]
 
 print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval} and wind_mu={wind_mu} and wind_sigma={wind_sigma} and world_model={world_model}")
 
@@ -41,8 +42,8 @@ results_records = []
 #------------------------------------------------------------------------------------------------------------------------------------------------
 start_time = time.time()
 mpc_results = evaluate_mpc_controllers(
-        controller='predictive',
-        world_model='dynamics',
+        controller=controller,
+        world_model=world_model,
         horizons=[20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
         recompute_intervals=[recompute_interval],
         dt = 0.02,
@@ -50,7 +51,7 @@ mpc_results = evaluate_mpc_controllers(
         wind_mus=[wind_mu],
         wind_sigmas=[wind_sigma],
         results_folder="../results/PerformanceResults/",
-        episode_length=1000,
+        episode_length=2000,
         num_episodes=5,
         init_angles=[0.0, 0.10, 0.15, 0.20])
 

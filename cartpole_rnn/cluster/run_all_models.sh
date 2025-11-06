@@ -16,18 +16,19 @@ declare -a recompute_intervals=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18)
 declare -a wind_mus=(0.0 0.05 0.1 0.15)
 declare -a wind_sigmas=(0.0 0.05 0.1 0.15)
 declare -a world_model=('dynamics')
+declare -a controller=('predictive')
 
 # Loop 1: length_ratio and recompute_interval combinations (wind_mu and wind_sigma fixed at first element)
 for length_ratio in "${length_ratios[@]}"; do
     for recompute_interval in "${recompute_intervals[@]}"; do
         sbatch \
-            --job-name="MPC_len${length_ratio}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}" \
+            --job-name="MPC_len${length_ratio}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}_controller${controller[0]}" \
             --account=carney-ashenhav-condo \
             --time=80:00:00 \
             --mem=40G \
             --nodes=1 \
-            -o "log/MPC_len${length_ratio}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}.%j.out" \
-            run_one_model.sh "$length_ratio" "$recompute_interval" "${wind_mus[0]}" "${wind_sigmas[0]}" "${world_model[0]}"
+            -o "log/MPC_len${length_ratio}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}_controller${controller[0]}.%j.out" \
+            run_one_model.sh "$length_ratio" "$recompute_interval" "${wind_mus[0]}" "${wind_sigmas[0]}" "${world_model[0]}" "${controller[0]}"
     done
 done
 
@@ -35,13 +36,13 @@ done
 for wind_mu in "${wind_mus[@]}"; do
     for recompute_interval in "${recompute_intervals[@]}"; do
         sbatch \
-            --job-name="MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mu}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}" \
+            --job-name="MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mu}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}_controller${controller[0]}" \
             --account=carney-ashenhav-condo \
             --time=80:00:00 \
             --mem=40G \
             --nodes=1 \
-            -o "log/MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mu}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}.%j.out" \
-            run_one_model.sh "${length_ratios[0]}" "$recompute_interval" "$wind_mu" "${wind_sigmas[0]}" "${world_model[0]}"
+            -o "log/MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mu}_windsigma${wind_sigmas[0]}_worldmodel${world_model[0]}_controller${controller[0]}.%j.out" \
+            run_one_model.sh "${length_ratios[0]}" "$recompute_interval" "$wind_mu" "${wind_sigmas[0]}" "${world_model[0]}" "${controller[0]}"
     done
 done
 
@@ -49,12 +50,12 @@ done
 # for wind_sigma in "${wind_sigmas[@]}"; do
 #     for recompute_interval in "${recompute_intervals[@]}"; do
 #         sbatch \
-#             --job-name="MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigma}_worldmodel${world_model[0]}" \
+#             --job-name="MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigma}_worldmodel${world_model[0]}_controller${controller[0]}" \
 #             --account=carney-ashenhav-condo \
 #             --time=80:00:00 \
 #             --mem=40G \
 #             --nodes=1 \
-#             -o "log/MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigma}_worldmodel${world_model[0]}.%j.out" \
-#             run_one_model.sh "${length_ratios[0]}" "$recompute_interval" "${wind_mus[0]}" "$wind_sigma" "${world_model[0]}"
+#             -o "log/MPC_len${length_ratios[0]}_recompute${recompute_interval}_windmu${wind_mus[0]}_windsigma${wind_sigma}_worldmodel${world_model[0]}_controller${controller[0]}.%j.out" \
+#             run_one_model.sh "${length_ratios[0]}" "$recompute_interval" "${wind_mus[0]}" "$wind_sigma" "${world_model[0]}_${controller[0]}"
 #     done
 # done
