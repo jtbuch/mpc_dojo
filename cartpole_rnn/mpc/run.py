@@ -21,8 +21,9 @@ length_ratio = float(sys.argv[1])
 recompute_interval = int(sys.argv[2])
 wind_mu = float(sys.argv[3])
 wind_sigma = float(sys.argv[4])
+world_model = sys.argv[5]
 
-print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval} and wind_mu={wind_mu} and wind_sigma={wind_sigma}")
+print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval} and wind_mu={wind_mu} and wind_sigma={wind_sigma} and world_model={world_model}")
 
 # Create 'Results' folder if it doesn't exist
 results_folder = "../results/PerformanceResults/"
@@ -41,6 +42,7 @@ results_records = []
 start_time = time.time()
 mpc_results = evaluate_mpc_controllers(
         controller='predictive',
+        world_model='dynamics',
         horizons=[20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
         recompute_intervals=[recompute_interval],
         dt = 0.02,
