@@ -27,6 +27,9 @@ class MDRNN(nn.Module):
     def __init__(self, state_dim=4, action_dim=1, hidden_dim=256, 
                  n_gaussian=5, n_layers=1):
         super().__init__()
+
+        import torch
+        import torch.nn as nn
         
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -802,10 +805,10 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                                 model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
                             elif controller == 'predictive':
                                 mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, recompute_every=e,
-                                                model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
+                                                model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
                             elif controller == 'random':
                                 mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, recompute_every=e,
-                                                model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
+                                                model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
 
 
                             episode_lengths = []

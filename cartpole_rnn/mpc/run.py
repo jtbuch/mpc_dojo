@@ -16,10 +16,6 @@ sys.path.insert(0, os.path.abspath(os.path.join('..')))
 from mpc.Cartpole_Control_Utils import *
 import time
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 # Parse command line arguments
 length_ratio = float(sys.argv[1])
 recompute_interval = int(sys.argv[2])
