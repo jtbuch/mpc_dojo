@@ -21,15 +21,12 @@ class MDRNN(nn.Module):
     
     Predicts next state distribution as a Gaussian Mixture Model.
     State: [x, x_dot, theta, theta_dot] (4D)
-    Action: discrete (0 or 1) for left/right
+    Action: one-hot encoded discrete action (2D for CartPole: [1,0] or [0,1])
     """
     
-    def __init__(self, state_dim=4, action_dim=1, hidden_dim=256, 
+    def __init__(self, state_dim=4, action_dim=2, hidden_dim=256, 
                  n_gaussian=5, n_layers=1):
         super().__init__()
-
-        import torch
-        import torch.nn as nn
         
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -45,16 +42,10 @@ class MDRNN(nn.Module):
             batch_first=True
         )
         
-        # Simplified output heads - using diagonal covariance for simplicity
+        # Output heads for mixture density network
         self.pi_head = nn.Linear(hidden_dim, n_gaussian)
         self.mu_head = nn.Linear(hidden_dim, n_gaussian * state_dim)
         self.sigma_head = nn.Linear(hidden_dim, n_gaussian * state_dim)
-        
-        # Optional: predict reward
-        self.reward_head = nn.Linear(hidden_dim, 1)
-        
-        # Optional: predict done flag
-        self.done_head = nn.Linear(hidden_dim, 1)
         
     def forward(self, states, actions, hidden=None):
         """
@@ -64,10 +55,11 @@ class MDRNN(nn.Module):
             hidden: tuple of (h, c) for LSTM hidden states
         
         Returns:
-            pi: mixture weights (batch, seq_len, n_gaussian)
-            mu: means (batch, seq_len, n_gaussian, state_dim)
-            sigma: std devs (batch, seq_len, n_gaussian, state_dim)
-            hidden: updated LSTM hidden state
+            dict with:
+                pi: mixture weights (batch, seq_len, n_gaussian)
+                mu: means (batch, seq_len, n_gaussian, state_dim)
+                sigma: std devs (batch, seq_len, n_gaussian, state_dim)
+                hidden: updated LSTM hidden state
         """
         batch_size, seq_len = states.shape[:2]
         
@@ -84,18 +76,12 @@ class MDRNN(nn.Module):
         
         # Apply activations
         pi = F.softmax(pi, dim=-1)  # Normalize mixture weights
-        sigma = F.softplus(sigma) + 1e-6  # Ensure positive std dev
-        
-        # Optional outputs
-        reward = self.reward_head(lstm_out)
-        done_logit = self.done_head(lstm_out)
+        sigma = F.softplus(sigma) + 0.01  # Ensure positive std dev with reasonable minimum
         
         return {
             'pi': pi,
             'mu': mu, 
             'sigma': sigma,
-            'reward': reward,
-            'done_logit': done_logit,
             'hidden': hidden
         }
     
@@ -103,14 +89,18 @@ class MDRNN(nn.Module):
         """Sample next state from the mixture distribution.
         
         Args:
-            pi: (n_gaussian,)
-            mu: (n_gaussian, state_dim)
-            sigma: (n_gaussian, state_dim)
-            temperature: sampling temperature
+            pi: (n_gaussian,) - mixture weights
+            mu: (n_gaussian, state_dim) - means
+            sigma: (n_gaussian, state_dim) - std devs
+            temperature: sampling temperature (higher = more random)
         
         Returns:
-            next_state: (state_dim,)
+            next_state: (state_dim,) - sampled next state
         """
+        # Apply temperature to mixture weights
+        if temperature != 1.0:
+            pi = F.softmax(torch.log(pi + 1e-8) / temperature, dim=-1)
+        
         # Sample mixture component
         k = torch.multinomial(pi, 1).item()
         
@@ -120,6 +110,60 @@ class MDRNN(nn.Module):
         next_state = torch.normal(mean, std)
         
         return next_state
+    
+    def predict_next_state(self, state, action, hidden=None, temperature=1.0, deterministic=False):
+        """Predict next state given current state and action.
+        
+        Args:
+            state: (state_dim,) numpy array or tensor
+            action: int (discrete action) or (action_dim,) one-hot array
+            hidden: LSTM hidden state, or None to create new
+            temperature: sampling temperature
+            deterministic: if True, return mean of highest-weight mixture component
+        
+        Returns:
+            next_state: (state_dim,) predicted next state
+            hidden: updated hidden state
+        """
+        device = next(self.parameters()).device
+        
+        # Convert inputs to tensors
+        if isinstance(state, np.ndarray):
+            state = torch.from_numpy(state).float()
+        if isinstance(action, int):
+            # Convert discrete action to one-hot
+            action_onehot = torch.zeros(self.action_dim)
+            action_onehot[action] = 1.0
+            action = action_onehot
+        elif isinstance(action, np.ndarray):
+            action = torch.from_numpy(action).float()
+        
+        # Add batch and sequence dimensions: (1, 1, dim)
+        state = state.unsqueeze(0).unsqueeze(0).to(device)
+        action = action.unsqueeze(0).unsqueeze(0).to(device)
+        
+        # Initialize hidden if needed
+        if hidden is None:
+            hidden = self.init_hidden(1, device)
+        
+        # Forward pass
+        with torch.no_grad():
+            outputs = self(state, action, hidden)
+        
+        # Get predictions for single timestep
+        pi = outputs['pi'][0, 0]      # (n_gaussian,)
+        mu = outputs['mu'][0, 0]      # (n_gaussian, state_dim)
+        sigma = outputs['sigma'][0, 0]  # (n_gaussian, state_dim)
+        
+        if deterministic:
+            # Return mean of highest-weight component
+            k = pi.argmax()
+            next_state = mu[k].cpu().numpy()
+        else:
+            # Sample from mixture
+            next_state = self.sample_prediction(pi, mu, sigma, temperature).cpu().numpy()
+        
+        return next_state, outputs['hidden']
     
     def init_hidden(self, batch_size, device):
         """Initialize LSTM hidden state."""
@@ -209,7 +253,8 @@ def load_model(save_dir='../trained_models', checkpoint=None, model_path=None):
         print(f"  Episodes experienced: {checkpoint_data['total_episodes_experienced']}")
     
     print(f"  Training iteration: {checkpoint_data['training_iteration']}")
-    print(f"  Final losses - Total: {checkpoint_data['total_loss']:.4f}, State: {checkpoint_data['state_loss']:.4f}")
+    print(f"  Final state loss: {checkpoint_data['state_loss']:.4f}")
+    print(f"  Action dimension: {checkpoint_data['action_dim']} (one-hot: {checkpoint_data['action_dim'] > 1})")
     
     return loaded_model, checkpoint_data
 
@@ -254,11 +299,12 @@ def cartpole_dynamics_rnn(self, state, action, hidden):
     
     Args:
         state: Current state [x, x_dot, theta, theta_dot] (numpy array or list)
-        action: Action to take (0 or 1, or float)
-        model_length: Not used for RNN (kept for compatibility)
+        action: Action to take (0 or 1, or float that gets converted to discrete)
+        hidden: LSTM hidden state tuple (h, c)
     
     Returns:
         next_state: [x, x_dot, theta, theta_dot] as numpy array
+        hidden: Updated LSTM hidden state
     """
     # Convert inputs to numpy if needed
     if not isinstance(state, np.ndarray):
@@ -266,35 +312,40 @@ def cartpole_dynamics_rnn(self, state, action, hidden):
     else:
         state = state.astype(np.float32)
 
+    # Convert action to discrete (0 or 1)
     if action >= 0:
-        discrete_action = 1.0
+        discrete_action = 1
     else:
-        discrete_action = 0.0
+        discrete_action = 0
     
-    # Convert action to proper format
-    action_array = np.array([float(discrete_action)], dtype=np.float32)
+    # Convert discrete action to one-hot encoding (2D for CartPole)
+    action_onehot = np.zeros(2, dtype=np.float32)
+    action_onehot[discrete_action] = 1.0
     
     # Convert to tensors with proper shape (batch=1, seq_len=1, dim)
     state_tensor = torch.from_numpy(state).unsqueeze(0).unsqueeze(0).to(self.device)  # (1, 1, 4)
-    action_tensor = torch.from_numpy(action_array).unsqueeze(0).unsqueeze(0).to(self.device)  # (1, 1, 1)
+    action_tensor = torch.from_numpy(action_onehot).unsqueeze(0).unsqueeze(0).to(self.device)  # (1, 1, 2)
      
     # Forward pass
     with torch.no_grad():
         outputs = self.rnn_model(state_tensor, action_tensor, hidden)
  
     # Update the hidden state
-    hidden = outputs['hidden']  # Update hidden state
+    hidden = outputs['hidden']
 
     # Extract mixture parameters
-    pi = outputs['pi'].squeeze(0).squeeze(0)
-    mu = outputs['mu'].squeeze(0).squeeze(0)
-    sigma = outputs['sigma'].squeeze(0).squeeze(0)
+    pi = outputs['pi'].squeeze(0).squeeze(0)      # (n_gaussian,)
+    mu = outputs['mu'].squeeze(0).squeeze(0)      # (n_gaussian, state_dim)
+    sigma = outputs['sigma'].squeeze(0).squeeze(0)  # (n_gaussian, state_dim)
+
+    # For controller, use MEAN of highest-weight component (more stable)
+    k = pi.argmax()
+    next_state_np = mu[k].cpu().numpy()
     
-    # Sample next state from the mixture distribution
-    next_state = self.rnn_model.sample_prediction(pi, mu, sigma, temperature=1.0)
-    next_state_np = next_state.cpu().numpy()
+    # # Sample next state from the mixture distribution
+    # next_state = self.rnn_model.sample_prediction(pi, mu, sigma, temperature=1.0)
+    # next_state_np = next_state.cpu().numpy()
     
-    # Return next state directly
     return next_state_np, hidden
 
 
@@ -463,61 +514,57 @@ class SamplingController:
 
         return actions
     
-    def calculate_trajectories(self, env, initial_obs, actions):
+    def calculate_trajectories(self, env, initial_obs, actions, hidden):
         """
-        Ttrajectory evaluation using Euler integration.
+        Trajectory evaluation using Euler integration.
         
         Args:
             env: Environment (for compatibility, not used in vectorized version)
             initial_obs: Initial state (4,)
             actions: Action trajectories (n_traj, horizon, 1)
+            hidden: Initial hidden state (tuple of tensors for LSTM)
             
         Returns:
             observations: (n_traj, horizon, 4)
-            discrete_rewards: (n_traj, horizon) - zeros for compatibility
-            done_flags: (n_traj, horizon) - zeros for compatibility
         """
-
         # Initialize output arrays
         observations = np.zeros([self.n_candidate_trajectories, self.horizon, env.observation_space.shape[0]])
-
+        
         # Loop over trajectories
         for i in range(self.n_candidate_trajectories):
-
-            current_state = initial_obs
-
-            if self.world_model == 'rnn':
-                # Initialize the hidden state
-                device = torch.device('cpu')
-                hidden = self.rnn_model.init_hidden(batch_size=1, device=device)
+            current_state = initial_obs.copy()  # Copy the state
+            
+            # Initialize hidden state for this trajectory
+            if self.world_model == 'rnn' and hidden is not None:
+                # Properly clone the hidden state for each trajectory
+                # Hidden is typically a tuple of (h, c) for LSTM
+                if isinstance(hidden, tuple):
+                    current_hidden = tuple(h.clone() for h in hidden)
+                else:
+                    current_hidden = hidden.clone()
+            else:
+                current_hidden = None
 
             # Simulate forward in time
             for step in range(self.horizon):
                 # Get actions for this time step 
                 action = actions[i, step, 0]
 
-                # Compute derivatives for all trajectories simultaneously
+                # Compute next state
                 if self.world_model == 'dynamics':
                     derivatives = cartpole_dynamics(self, current_state, action, self.length)
-                    current_state = current_state + derivatives * self.dt
                     # Euler integration: x_{t+1} = x_t + dt * f(x_t, u_t)
                     current_state = current_state + derivatives * self.dt
                 elif self.world_model == 'rnn':
-                    current_state, hidden = cartpole_dynamics_rnn(self, current_state, action, hidden)
- 
+                    current_state, current_hidden = cartpole_dynamics_rnn(
+                        self, current_state, action, current_hidden
+                    )
                 
-                # # Add noise to the state
-                # current_state += np.random.normal(self.wind_mu, self.wind_sigma, size=current_state.shape)
-
-                # wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma, size=current_state.shape)
-                # wind_disturbance[2] += np.random.normal(self.wind_mu, self.wind_sigma)  # Extra noise on theta
-                # current_state += wind_disturbance
-
                 observations[i, step] = current_state
 
         return observations
-    
-    def get_action(self, obs, env):
+        
+    def get_action(self, obs, env, hidden):
         """Handle trajectory-based methods (random, predictive)."""
         
         # Initialize nominal trajectory for predictive methods
@@ -529,7 +576,7 @@ class SamplingController:
         actions = self.generate_action_trajectories(env, obs)
         
         # Evaluate trajectories
-        observations = self.calculate_trajectories(env, obs, actions)
+        observations = self.calculate_trajectories(env, obs, actions, hidden)
         
         # Calculate rewards and select best
         cumulative_rewards = self.calculate_trajectory_rewards(env, actions, observations)
@@ -772,8 +819,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
         # Load the model
         # rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_400000_steps.pt')
         # rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_1200000_steps.pt')
-        rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_2000000_steps.pt')
-        
+        rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_5000000_steps.pt')    
 
         # Set device
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -833,10 +879,16 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                 done = False
                                 states = []
 
+                                    # Initialize the rnn model hidden state if needed
+                                if world_model == 'rnn':
+
+                                    # Initialize the hidden state
+                                    hidden = rnn_model.init_hidden(batch_size=1, device=device)   
+
                                 while not done and length < episode_length:
                                     if step % e == 0:
                                         within_step = 0
-                                        trajectory, predictions = mpc.get_action(obs, env)
+                                        trajectory, predictions = mpc.get_action(obs, env, hidden)
                                         trajectory = trajectory.flatten()
                                     else:
                                         within_step += 1
@@ -861,6 +913,23 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                     states.append(obs)
                                     step += 1
                                     length += 1
+
+                                    # Get the hidden state for next step if RNN
+                                    if world_model == 'rnn' and rnn_model is not None:
+                                        # Convert discrete action to one-hot encoding (2D for CartPole)
+                                        action_onehot = np.zeros(2, dtype=np.float32)
+                                        action_onehot[action] = 1
+                                        
+                                        # Convert to tensors with proper shape (batch=1, seq_len=1, dim)
+                                        state_tensor = torch.from_numpy(obs).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 4)
+                                        action_tensor = torch.from_numpy(action_onehot).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 2)
+                                        
+                                        # Forward pass
+                                        with torch.no_grad():
+                                            outputs = rnn_model(state_tensor, action_tensor, hidden)
+                                    
+                                        # Update the hidden state
+                                        hidden = outputs['hidden']
                                 
                                 episode_end_time = time.time()
                                 episode_time = episode_end_time - episode_start_time
@@ -966,7 +1035,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
         # Load the model
         # rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_400000_steps.pt')
         # rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_1200000_steps.pt')
-        rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_2000000_steps.pt')
+        rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_5000000_steps.pt')
         
 
         # Set device
@@ -1050,6 +1119,12 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
     
     trajectory = None
     all_predictions = None
+
+    # Initialize hidden state for RNN if needed
+    hidden = None
+    if world_model == 'rnn' and rnn_model is not None:
+        device = torch.device('cpu')
+        hidden = rnn_model.init_hidden(batch_size=1, device=device)
     
     while length < episode_length and not done:  
         # Calculate current running average (what we're actually using for decisions)
@@ -1094,7 +1169,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
         # Get action from controller
         if step % current_recompute == 0:
             within_step = 0
-            trajectory, all_predictions = controller.get_action(obs, env)
+            trajectory, all_predictions = controller.get_action(obs, env, hidden)
             trajectory = trajectory.flatten()
         else:
             within_step = (step % current_recompute)
@@ -1130,6 +1205,23 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
 
         cost_prediction_error = calculate_cost_error(controller_type, obs, predictions, discrete_action)
         cost_prediction_errors.append(cost_prediction_error)
+
+        # Get the hidden state for next step if RNN
+        if world_model == 'rnn' and rnn_model is not None:
+            # Convert discrete action to one-hot encoding (2D for CartPole)
+            action_onehot = np.zeros(2, dtype=np.float32)
+            action_onehot[discrete_action] = 1.0
+            
+            # Convert to tensors with proper shape (batch=1, seq_len=1, dim)
+            state_tensor = torch.from_numpy(obs).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 4)
+            action_tensor = torch.from_numpy(action_onehot).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 2)
+            
+            # Forward pass
+            with torch.no_grad():
+                outputs = rnn_model(state_tensor, action_tensor, hidden)
+        
+            # Update the hidden state
+            hidden = outputs['hidden']
         
         # Add to buffer for adaptive recompute
         if adaptive_recompute:
