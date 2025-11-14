@@ -904,7 +904,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                 }
                             }
 
-                            filename = f"mpc__cont{controller}_h{h}_e{e}_r{ratio:.1f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
+                            filename = f"mpc__cont{controller}_model{world_model}_h{h}_e{e}_r{ratio:.1f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
                             filepath = os.path.join(results_folder, filename)
                             
                             with open(filepath, 'wb') as f:
