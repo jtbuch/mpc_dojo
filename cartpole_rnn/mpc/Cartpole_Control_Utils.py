@@ -260,12 +260,12 @@ def load_model(save_dir='../trained_models', checkpoint=None, model_path=None):
 
 def cartpole_dynamics(self, state, action, model_length):
     """Works with both symbolic and numeric inputs"""
-    self.gravity = 9.81
-    self.masscart = 1.0
-    self.masspole = 0.1
-    self.length = model_length
-    self.total_mass = self.masscart + self.masspole
-    self.polemass_length = self.masspole * self.length
+    gravity = 9.81
+    masscart = 1.0
+    masspole = 0.1
+    length = model_length  # Use local variable
+    total_mass = masscart + masspole
+    polemass_length = masspole * length
 
     x, x_dot, theta, theta_dot = state[0], state[1], state[2], state[3]
     u = action
@@ -282,11 +282,11 @@ def cartpole_dynamics(self, state, action, model_length):
         sintheta = np.sin(theta)
         is_symbolic = False
     
-    temp = (u + self.polemass_length * theta_dot**2 * sintheta) / self.total_mass
-    thetaacc = (self.gravity * sintheta - costheta * temp) / (
-                self.length * (4.0/3.0 - self.masspole * costheta**2 / self.total_mass)
+    temp = (u + polemass_length * theta_dot**2 * sintheta) / total_mass
+    thetaacc = (gravity * sintheta - costheta * temp) / (
+                length * (4.0/3.0 - masspole * costheta**2 / total_mass)
             )
-    xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+    xacc = temp - polemass_length * thetaacc * costheta / total_mass
     
     if is_symbolic:
         return [x_dot, xacc, theta_dot, thetaacc]
@@ -416,7 +416,7 @@ class MPCController:
         
         self.mpc.setup()
 
-    def get_action(self, obs, env=None):
+    def get_action(self, obs, env=None, hidden=None):
         # obs_with_noise = obs.copy()
         # wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma)
         # obs_with_noise[2] += wind_disturbance
@@ -431,6 +431,7 @@ class MPCController:
         theta_dot_pred = self.mpc.data.prediction(('_x', 'theta_dot')).squeeze()[1:]
 
         predictions = np.vstack([x_pred, x_dot_pred, theta_pred, theta_dot_pred]).T
+
 
         return trajectory, predictions
     
