@@ -596,7 +596,7 @@ class SamplingController:
         
         # Match MPC objective exactly
         stage_cost = (10 * obs[:, :, 2]**2 +     # 10*theta^2
-                    obs[:, :, 0]**2 +           # x^2  
+                    10*obs[:, :, 0]**2 +           # x^2  
                     obs[:, :, 3]**2 +           # theta_dot^2
                     obs[:, :, 1]**2)            # x_dot^2
         
@@ -879,11 +879,13 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                 done = False
                                 states = []
 
-                                    # Initialize the rnn model hidden state if needed
+                                # Initialize the rnn model hidden state if needed
                                 if world_model == 'rnn':
 
                                     # Initialize the hidden state
                                     hidden = rnn_model.init_hidden(batch_size=1, device=device)   
+                                else:
+                                    hidden = None
 
                                 while not done and length < episode_length:
                                     if step % e == 0:
@@ -1003,12 +1005,12 @@ def calculate_cost_error(controller_type, true_state, predicted_state, action):
     true_cost = 0.0
     predicted_cost = 0.0
 
-    true_cost -= 10 * (true_state[1]**2) + true_state[0]**2
-    true_cost -= (true_state[2]**2 + true_state[3]**2)
+    true_cost -= (true_state[1]**2) + 10*(true_state[0]**2)
+    true_cost -= (10 * (true_state[2]**2) + true_state[3]**2)
     true_cost -= 0.1 * (action**2)
 
-    predicted_cost -= 10 * (predicted_state[1]**2) + predicted_state[0]**2
-    predicted_cost -= (predicted_state[2]**2 + predicted_state[3]**2)
+    predicted_cost -= (predicted_state[1]**2) + 10*(predicted_state[0]**2)
+    predicted_cost -= (10 * (predicted_state[2]**2) + predicted_state[3]**2)
     predicted_cost -= 0.1 * (action**2)
 
     cost_pe = abs(true_cost - predicted_cost)
@@ -1035,7 +1037,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
         # Load the model
         # rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_400000_steps.pt')
         # rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_1200000_steps.pt')
-        rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_5000000_steps.pt')
+        rnn_model, checkpoint_data = load_model(model_path='../trained_models/mdrnn_10000000_steps.pt')
         
 
         # Set device
@@ -1299,7 +1301,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
     ax4.set_title('Prediction Errors Over Time')
     ax4.grid(True, alpha=0.3)
     ax4.legend()
-    ax4.set_ylim([-1, 1])
+    ax4.set_ylim([-0.5, 0.5])
 
     # Plot 5: Cost prediction error with running average
     ax5.plot(time_steps, cost_prediction_errors, 'm-', linewidth=1, alpha=0.3, label='Cost Prediction Error')
@@ -1318,7 +1320,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
     ax5.set_title('Cost Prediction Error Over Time')
     ax5.grid(True, alpha=0.3)
     ax5.legend()
-    ax5.set_ylim([0, 4])
+    ax5.set_ylim([0, 1])
 
     # Plot 6: Recompute level over time
     ax6.plot(time_steps, recompute_history, 'r-', linewidth=2, alpha=0.7, label='Recompute Level')
