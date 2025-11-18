@@ -863,18 +863,18 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                 # Set the environment time step
                                 env.unwrapped.tau = dt
 
-                                # Change the initial angle
-                                new_state = obs.copy()
-                                new_state[2] += init_angle
-                                env.unwrapped.state = new_state
-                                obs = new_state
-
                                 # Change the pole length in simulation
                                 env_length = ratio * true_length
                                 env.unwrapped.length = env_length
 
                                 # Reset the env with seed
                                 obs, _ = env.reset(seed=seed + ep)
+
+                                # Change the initial angle
+                                new_state = obs.copy()
+                                new_state[2] += init_angle
+                                env.unwrapped.state = new_state
+                                obs = new_state
                                
                                 length, step = 0, 0
                                 done = False
