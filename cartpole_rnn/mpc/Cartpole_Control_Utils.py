@@ -432,7 +432,6 @@ class MPCController:
 
         predictions = np.vstack([x_pred, x_dot_pred, theta_pred, theta_dot_pred]).T
 
-
         return trajectory, predictions
     
 class SamplingController:
@@ -808,10 +807,6 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
 
     # Get the pole lenght from the environment
     env = gym.make("CartPole-v1", render_mode=None)
-    
-    # Set the environment time step
-    env.unwrapped.tau = dt
-    env.reset()   
 
     # Initialize the rnn model if needed
     if world_model == 'rnn':
@@ -841,11 +836,6 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                         for ratio in length_ratios:
                             # Get the start_time
                             start_time = time.time()
-
-                            # Change the pole length in simulation
-                            true_length = env.unwrapped.length
-                            env_length = ratio * true_length
-                            env.unwrapped.length = env_length
                                                         
                             if controller == 'mpc':
                                 mpc = MPCController(horizon=h, recompute_every=e, 
@@ -866,16 +856,24 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                 episode_start_time = time.time()
 
                                 env = gym.make("CartPole-v1", render_mode=None)
+
+                                # Set the environment time step
                                 env.unwrapped.tau = dt
-                                        
-                                obs, _ = env.reset(seed=seed + ep)
 
                                 # Change the initial angle
                                 new_state = obs.copy()
                                 new_state[2] += init_angle
                                 env.unwrapped.state = new_state
                                 obs = new_state
-                                
+
+                                # Change the pole length in simulation
+                                true_length = env.unwrapped.length
+                                env_length = ratio * true_length
+                                env.unwrapped.length = env_length
+
+                                # Reset the env with seed
+                                obs, _ = env.reset(seed=seed + ep)
+                               
                                 length, step = 0, 0
                                 done = False
                                 states = []
