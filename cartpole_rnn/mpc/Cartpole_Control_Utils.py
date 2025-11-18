@@ -836,6 +836,9 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                         for ratio in length_ratios:
                             # Get the start_time
                             start_time = time.time()
+
+                            # Take the pole length from the environment
+                            true_length = env.unwrapped.length
                                                         
                             if controller == 'mpc':
                                 mpc = MPCController(horizon=h, recompute_every=e, 
@@ -867,7 +870,6 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                 obs = new_state
 
                                 # Change the pole length in simulation
-                                true_length = env.unwrapped.length
                                 env_length = ratio * true_length
                                 env.unwrapped.length = env_length
 
