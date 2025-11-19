@@ -11,12 +11,12 @@
 #SBATCH -o log/R-%x.%j.out
 
 # Array of intervals and horizons
-declare -a length_ratios=(1.0 2.0 3.0 4.0)
+declare -a length_ratios=(0.6 0.8 1.0 1.2 1.6)
 #declare -a recompute_intervals=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18)
-declare -a recompute_intervals=(1 2 3 4 5 6 7 8 9 10)
-declare -a wind_mus=(0.0 0.05 0.1 0.15)
+declare -a recompute_intervals=(1 2 3 4 5 6)
+declare -a wind_mus=(0.0 0.02 0.04 0.06)
 declare -a wind_sigmas=(0.0 0.05 0.1 0.15)
-declare -a world_model=('rnn')
+declare -a world_model=('dynamics')
 declare -a controller=('predictive')
 
 # Loop 1: length_ratio and recompute_interval combinations (wind_mu and wind_sigma fixed at first element)

@@ -350,7 +350,7 @@ def cartpole_dynamics_rnn(self, state, action, hidden):
 
 
 class MPCController:
-    def __init__(self, horizon=10, dt=0.02, recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0):
+    def __init__(self, horizon=10, dt=0.01, recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0):
         self.horizon = horizon
         self.dt = dt
         self.recompute_every = recompute_every
@@ -435,7 +435,7 @@ class MPCController:
         return trajectory, predictions
     
 class SamplingController:
-    def __init__(self, controller='predictive',world_model='dynamics',horizon=10, dt=0.02, recompute_every=1, model_length=1.0, wind_mu=0.0, wind_sigma=0.0, rnn_model=None):
+    def __init__(self, controller='predictive',world_model='dynamics',horizon=10, dt=0.01, recompute_every=1, model_length=1.0, wind_mu=0.0, wind_sigma=0.0, rnn_model=None):
         self.horizon = horizon
         self.dt = dt
         self.recompute_every = recompute_every
@@ -606,195 +606,6 @@ class SamplingController:
         
         return reward.sum(axis=1)
 
-class StepSamplingController:
-    def __init__(self, controller='predictive',world_model='dynamics',horizon=10, dt=0.02, recompute_every=1, model_length=1.0, wind_mu=0.0, wind_sigma=0.0, rnn_model=None):
-        self.horizon = horizon
-        self.dt = dt
-        self.recompute_every = recompute_every
-
-        self.world_model = world_model
-        self.rnn_model = rnn_model
-        
-        self.length = model_length
-        self.wind_mu = wind_mu
-        self.wind_sigma = wind_sigma
-        self.control_model = controller
-
-        self.wind_mu = wind_mu
-        self.wind_sigma = wind_sigma
-
-        self.force_mag = 10.0
-        self.gravity = 9.81
-        self.masscart = 1.0
-        self.masspole = 0.1
-
-    def generate_action_trajectories(self, env, obs):
-        """Generate action trajectories based on control model."""
-        self.n_candidate_trajectories = 200
-
-        actions = np.zeros([self.n_candidate_trajectories, self.horizon, 1])
-        
-        if self.control_model == 'predictive':
-            # Shift nominal trajectory
-            if self.horizon > 1:
-                self.nominal_trajectory = np.vstack([
-                    self.nominal_trajectory[1:],
-                    np.zeros((1, 1))
-                ])           
-            # First candidate is nominal
-            actions[0] = self.nominal_trajectory
-            
-            # Add noise for other candidates
-            if self.n_candidate_trajectories > 1:
-
-                # Generate all random actions at once
-                actions[1:] = np.random.choice(
-                    [-self.force_mag, self.force_mag],
-                    size=(self.n_candidate_trajectories - 1, self.horizon, 1)
-                )
-    
-                # noise_std = 2.0
-                # for i in range(1, self.n_candidate_trajectories):
-                #     # noise = np.random.normal(0, noise_std, self.nominal_trajectory.shape)
-                #     # actions[i] = np.clip(
-                #     #     self.nominal_trajectory + noise,
-                #     #     -self.force_mag, self.force_mag
-                #     # )
-  
-        
-        elif self.control_model == 'random':
-            # Random shooting
-            # actions = np.random.uniform(
-            #     low=-self.force_mag,
-            #     high=self.force_mag,
-            #     size=(self.n_candidate_trajectories, self.horizon, 1))
-            # randomly sample from two options -self.force_mag and +self.force_mag
-            actions = np.random.choice(
-                [-self.force_mag, self.force_mag],
-                size=(self.n_candidate_trajectories, self.horizon, 1)
-            )
-        # Discretize actions to -10 or +10
-        actions = np.where(actions >= 0, self.force_mag, -self.force_mag)
-
-        return actions
-    
-    def calculate_trajectories(self, env, initial_obs, actions):
-        """
-        Ttrajectory evaluation using Euler integration.
-        
-        Args:
-            env: Environment (for compatibility, not used in vectorized version)
-            initial_obs: Initial state (4,)
-            actions: Action trajectories (n_traj, horizon, 1)
-            
-        Returns:
-            observations: (n_traj, horizon, 4)
-            discrete_rewards: (n_traj, horizon) - zeros for compatibility
-            done_flags: (n_traj, horizon) - zeros for compatibility
-        """
-
-        # Initialize output arrays
-        observations = np.zeros([self.n_candidate_trajectories, self.horizon, env.observation_space.shape[0]])
-
-        # Loop over trajectories
-        for i in range(self.n_candidate_trajectories):
-
-            current_state = initial_obs
-
-            # Simulate forward in time
-            for step in range(self.horizon):
-                # Get actions for this time step 
-                action = actions[i, step, 0]
-                
-                # Compute derivatives for all trajectories simultaneously
-                if self.world_model == 'dynamics':
-                    derivatives = cartpole_dynamics(self, current_state, action, self.length)
-                    current_state = current_state + derivatives * self.dt
-                    # Euler integration: x_{t+1} = x_t + dt * f(x_t, u_t)
-                    current_state = current_state + derivatives * self.dt
-                elif self.world_model == 'rnn':
-                    current_state = cartpole_dynamics_rnn(self, current_state, action)
-
-                # Add noise to the state
-                # current_state += np.random.normal(self.wind_mu, self.wind_sigma, size=current_state.shape)
-
-                # wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma, size=current_state.shape)
-                # wind_disturbance[2] += np.random.normal(self.wind_mu, self.wind_sigma)  # Extra noise on theta
-                # current_state += wind_disturbance
-
-                observations[i, step] = current_state
-
-        return observations
-    
-    def get_action(self, obs, env):
-        """Handle trajectory-based methods (random, predictive)."""
-        actions = np.zeros([self.horizon, 1])
-        observations = np.zeros([self.horizon, env.observation_space.shape[0]])
-
-        current_state = obs
-
-        # Simulate forward in time
-        for step in range(self.horizon):
-            # Get states for two actions
-            action1 = -self.force_mag
-            action2 = self.force_mag           
-                
-            # Compute derivatives for all trajectories simultaneously
-            if self.world_model == 'dynamics':
-                derivatives1 = cartpole_dynamics(self, current_state, action1, self.length)
-                derivatives2 = cartpole_dynamics(self, current_state, action2, self.length)
-                current_state1 = current_state + derivatives1 * self.dt
-                current_state2 = current_state + derivatives2 * self.dt
-                # Euler integration: x_{t+1} = x_t + dt * f(x_t, u_t)
-                current_state1 = current_state + derivatives1 * self.dt
-                current_state2 = current_state + derivatives2 * self.dt
-            elif self.world_model == 'rnn':
-                current_state1 = cartpole_dynamics_rnn(self, current_state, action1)
-                current_state2 = cartpole_dynamics_rnn(self, current_state, action2)
-
-            # Add noise to the state
-            current_state1 += np.random.normal(self.wind_mu, self.wind_sigma, size=current_state.shape)
-            current_state2 += np.random.normal(self.wind_mu, self.wind_sigma, size=current_state.shape)
-
-            wind_disturbance = np.random.normal(self.wind_mu, self.wind_sigma, size=current_state.shape)
-            wind_disturbance[2] += np.random.normal(self.wind_mu, self.wind_sigma)  # Extra noise on theta
-            current_state1 += wind_disturbance
-            current_state2 += wind_disturbance
-
-            # Evaluate the two states with respect to the cost function
-            action, current_state = self.get_optimal_action(current_state1, current_state2, action1, action2)
-            actions[step,:] = action
-            observations[step,:] = current_state
-
-        return actions, observations
- 
-    def get_optimal_action(self, current_state1, current_state2, action1, action2):
-        
-        # Match MPC objective exactly
-        stage_cost1 = (10 * current_state1[2]**2 +     # 10*theta^2
-                    current_state1[0]**2 +           # x^2  
-                    current_state1[3]**2 +           # theta_dot^2
-                    current_state1[1]**2)            # x_dot^2
-        
-        stage_cost2 = (10 * current_state2[2]**2 +     # 10*theta^2
-                    current_state2[0]**2 +           # x^2  
-                    current_state2[3]**2 +           # theta_dot^2
-                    current_state2[1]**2)            # x_dot^2
-        
-        action_cost1 = 0.1 * action1**2   # Match MPC's rterm
-        action_cost2 = 0.1 * action2**2   # Match MPC's rterm
-        
-        reward1 = -(stage_cost1 + action_cost1)  # Negative because we maximize reward
-        reward2 = -(stage_cost2 + action_cost2)  # Negative because we maximize reward
-
-        if reward1>reward2:
-            optimal_action = action1
-            predicted_state = current_state1
-        else:
-            optimal_action = action2
-            predicted_state = current_state2
-        return optimal_action, predicted_state
-
 def evaluate_mpc_controllers(controller, world_model, horizons, recompute_intervals, dt, results_folder="../results/PerformanceResults/", 
                              episode_length=500, num_episodes=20, seed=42, 
                              length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0]):
@@ -803,10 +614,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
     if min(recompute_intervals) > min(horizons):
         raise ValueError("The smallest recompute interval must be less than or equal to the smallest horizon.")
     
-    os.makedirs(results_folder, exist_ok=True)
-
-    # Get the pole lenght from the environment
-    env = gym.make("CartPole-v1", render_mode=None)
+    os.makedirs(results_folder, exist_ok=True)    
 
     # Initialize the rnn model if needed
     if world_model == 'rnn':
@@ -837,17 +645,27 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                             # Get the start_time
                             start_time = time.time()
 
+                            # Get the pole lenght from the environment
+                            env = gym.make("CartPole-v1", render_mode=None)
+
+                            # Set the environment time step
+                            env.unwrapped.tau = dt
+
                             # Take the pole length from the environment
                             true_length = env.unwrapped.length
+
+                            # Change the pole length in simulation
+                            env_length = ratio * true_length
+                            env.unwrapped.length = env_length
                                                         
                             if controller == 'mpc':
-                                mpc = MPCController(horizon=h, recompute_every=e, 
+                                mpc = MPCController(horizon=h, dt = dt, recompute_every=e, 
                                                 model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
                             elif controller == 'predictive':
-                                mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, recompute_every=e,
+                                mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, dt=dt, recompute_every=e,
                                                 model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
                             elif controller == 'random':
-                                mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, recompute_every=e,
+                                mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, dt=dt, recompute_every=e,
                                                 model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
 
 
@@ -858,17 +676,11 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                             for ep in range(num_episodes):
                                 episode_start_time = time.time()
 
-                                env = gym.make("CartPole-v1", render_mode=None)
-
-                                # Set the environment time step
-                                env.unwrapped.tau = dt
-
-                                # Change the pole length in simulation
-                                env_length = ratio * true_length
-                                env.unwrapped.length = env_length
-
                                 # Reset the env with seed
                                 obs, _ = env.reset(seed=seed + ep)
+
+                                # Print the env tau and length for verification
+                                print(f"Episode {ep+1}/{num_episodes}: env tau={env.unwrapped.tau}, env length={env.unwrapped.length}")
 
                                 # Change the initial angle
                                 new_state = obs.copy()
@@ -912,6 +724,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                     wind_disturbance = np.zeros(obs.shape)
                                     wind_disturbance[2] += np.random.normal(wind_mu, wind_sigma)  # Extra noise on theta
                                     obs += wind_disturbance
+                                    env.unwrapped.state = obs
                                         
                                     states.append(obs)
                                     step += 1
@@ -1052,17 +865,17 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
 
     # Get the pole length from the environment
     env = gym.make("CartPole-v1", render_mode=None)
-    
+
+    # Initialize with the seed
+    obs, _ = env.reset(seed=seed)
+
     # Set the environment time step
-    env.unwrapped.tau = dt
+    env.unwrapped.tau = dt  
     
     # Change the pole length in simulation
     model_length = env.unwrapped.length
     env_length = ratio * model_length
     env.unwrapped.length = env_length
-    env.reset()
-
-    print(f"True length: {env_length}, Model length: {model_length}")
     
     # Initialize adaptive recompute parameters
     current_recompute = recompute_every  # Start with initial value
@@ -1089,19 +902,6 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
 
     else:
         raise ValueError("controller_type must be 'mpc', 'predictive', or 'random'")
-    
-    # Initialize environment (create fresh one with tau set)
-    env = gym.make("CartPole-v1", render_mode=None)
-
-    # Set the environment time step
-    env.unwrapped.tau = dt
-    
-    # Change the pole length in simulation
-    true_length = env.unwrapped.length
-    env_length = ratio * true_length
-    env.unwrapped.length = env_length
-    env.reset()
-    obs, _ = env.reset(seed=seed)
 
     # Change the initial angle
     new_state = obs.copy()
@@ -1137,7 +937,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
             current_running_avg = np.nan  # No data yet
         
         running_average_history.append(current_running_avg)
-        
+
         # Adaptive recompute adjustment
         if adaptive_recompute and len(cost_error_buffer) == adaptation_window:
             running_avg = np.mean(cost_error_buffer)
@@ -1201,6 +1001,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
         wind_disturbance = np.zeros(obs.shape)
         wind_disturbance[2] += np.random.normal(wind_mu, wind_sigma)  # Extra noise on theta
         obs += wind_disturbance
+        env.unwrapped.state = obs
         
         prediction_errors.append(obs - predictions)
         step += 1

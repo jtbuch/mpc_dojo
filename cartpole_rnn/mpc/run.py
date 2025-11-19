@@ -45,7 +45,7 @@ mpc_results = evaluate_mpc_controllers(
         controller=controller,
         world_model=world_model,
         #horizons=[20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
-        horizons=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        horizons=[20, 60, 100, 140, 180, 220],
         recompute_intervals=[recompute_interval],
         dt = 0.01,
         length_ratios=[length_ratio],
@@ -53,7 +53,7 @@ mpc_results = evaluate_mpc_controllers(
         wind_sigmas=[wind_sigma],   
         results_folder="../results/PerformanceResults/",
         episode_length=2000,
-        num_episodes=3,
+        num_episodes=2,
         init_angles=[0.0])#, 0.10, 0.15, 0.20])
 
 
