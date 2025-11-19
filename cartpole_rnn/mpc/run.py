@@ -23,6 +23,10 @@ wind_mu = float(sys.argv[3])
 wind_sigma = float(sys.argv[4])
 world_model = sys.argv[5]
 controller = sys.argv[6]
+gravity_ratio = float(sys.argv[7])
+masscart_ratio = float(sys.argv[8])
+masspole_ratio = float(sys.argv[9])
+
 
 print(f"Running simulation with length_ratio={length_ratio} and recompute_interval={recompute_interval} and wind_mu={wind_mu} and wind_sigma={wind_sigma} and world_model={world_model}")
 
@@ -44,10 +48,13 @@ start_time = time.time()
 mpc_results = evaluate_mpc_controllers(
         controller=controller,
         world_model=world_model,
-        horizons=[30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
+        horizons=[40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240],
         recompute_intervals=[recompute_interval],
         dt = 0.01,
         length_ratios=[length_ratio],
+        gravity_ratios=[gravity_ratio],
+        masscart_ratios=[masscart_ratio],
+        masspole_ratios=[masspole_ratio],
         wind_mus=[wind_mu],
         wind_sigmas=[wind_sigma],   
         results_folder="../results/PerformanceResults/",

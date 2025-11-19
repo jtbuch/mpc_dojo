@@ -258,12 +258,12 @@ def load_model(save_dir='../trained_models', checkpoint=None, model_path=None):
     
     return loaded_model, checkpoint_data
 
-def cartpole_dynamics(self, state, action, model_length):
+def cartpole_dynamics(self, state, action):
     """Works with both symbolic and numeric inputs"""
-    gravity = 9.81
-    masscart = 1.0
-    masspole = 0.1
-    length = model_length  # Use local variable
+    gravity = self.gravity
+    masscart = self.masscart
+    masspole = self.masspole
+    length = self.length  # Use instance variable
     total_mass = masscart + masspole
     polemass_length = masspole * length
 
@@ -350,14 +350,17 @@ def cartpole_dynamics_rnn(self, state, action, hidden):
 
 
 class MPCController:
-    def __init__(self, horizon=10, dt=0.01, recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0):
+    # self.gravity = 9.8  
+    # self.masscart = 1.0
+    # self.masspole = 0.1
+    def __init__(self, horizon=10, dt=0.01, recompute_every=1, model_length=0.5, model_gravity=9.8, model_masscart=1.0, model_masspole=0.1, wind_mu=0.0, wind_sigma=0.0):
         self.horizon = horizon
         self.dt = dt
         self.recompute_every = recompute_every
         self.force_mag = 10.0
-        self.gravity = 9.8  
-        self.masscart = 1.0
-        self.masspole = 0.1
+        self.gravity = model_gravity  
+        self.masscart = model_masscart
+        self.masspole = model_masspole
         
         self.length = model_length
         self.total_mass = self.masscart + self.masspole
@@ -376,7 +379,7 @@ class MPCController:
 
         # Get the derivatives
         state = [x, x_dot, theta, theta_dot]
-        derivatives = cartpole_dynamics(self, state, u, model_length=self.length)
+        derivatives = cartpole_dynamics(self, state, u)
         
         # Unpack the returned list
         x_dot_rhs = derivatives[0]
@@ -435,7 +438,7 @@ class MPCController:
         return trajectory, predictions
     
 class SamplingController:
-    def __init__(self, controller='predictive',world_model='dynamics',horizon=10, dt=0.01, recompute_every=1, model_length=1.0, wind_mu=0.0, wind_sigma=0.0, rnn_model=None):
+    def __init__(self, controller='predictive',world_model='dynamics',horizon=10, dt=0.01, recompute_every=1, model_length=1.0, model_gravity=9.8, model_masscart=1.0, model_masspole=0.1, wind_mu=0.0, wind_sigma=0.0, rnn_model=None):
         self.horizon = horizon
         self.dt = dt
         self.recompute_every = recompute_every
@@ -452,9 +455,9 @@ class SamplingController:
         self.wind_sigma = wind_sigma
 
         self.force_mag = 10.0
-        self.gravity = 9.81
-        self.masscart = 1.0
-        self.masspole = 0.1
+        self.gravity = model_gravity
+        self.masscart = model_masscart
+        self.masspole = model_masspole
 
         if world_model == 'rnn' and rnn_model is not None:
             self.device = torch.device('cpu')  # or 'cuda' if available
@@ -552,7 +555,7 @@ class SamplingController:
 
                 # Compute next state
                 if self.world_model == 'dynamics':
-                    derivatives = cartpole_dynamics(self, current_state, action, self.length)
+                    derivatives = cartpole_dynamics(self, current_state, action)
                     # Euler integration: x_{t+1} = x_t + dt * f(x_t, u_t)
                     current_state = current_state + derivatives * self.dt
                 elif self.world_model == 'rnn':
@@ -608,9 +611,8 @@ class SamplingController:
 
 def evaluate_mpc_controllers(controller, world_model, horizons, recompute_intervals, dt, results_folder="../results/PerformanceResults/", 
                              episode_length=500, num_episodes=20, seed=42, 
-                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.6], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0]):
+                             length_ratios=[0.6, 0.8, 1.0, 1.2, 1.4], gravity_ratios=[0.6, 0.8, 1.0, 1.2, 1.4], masscart_ratios=[0.6, 0.8, 1.0, 1.2, 1.4], masspole_ratios=[0.6, 0.8, 1.0, 1.2, 1.4], wind_mus=[0.0], wind_sigmas=[0.0], init_angles=[0.0]):
     """Evaluate MPC with various parameters and save each configuration separately."""
-    
     if min(recompute_intervals) > min(horizons):
         raise ValueError("The smallest recompute interval must be less than or equal to the smallest horizon.")
     
@@ -642,177 +644,194 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                 for h in horizons:
                     for e in recompute_intervals:
                         for ratio in length_ratios:
-                            # Get the start_time
-                            start_time = time.time()
+                            for gravity_ratio in gravity_ratios:
+                                for masscart_ratio in masscart_ratios:
+                                    for masspole_ratio in masspole_ratios:
+                                        # Get the start_time
+                                        start_time = time.time()
 
-                            # Get the pole lenght from the environment
-                            env = gym.make("CartPole-v1", render_mode=None)
+                                        # Get the pole lenght from the environment
+                                        env = gym.make("CartPole-v1", render_mode=None)
 
-                            # Set the environment time step
-                            env.unwrapped.tau = dt
+                                        # Set the environment time step
+                                        env.unwrapped.tau = dt
 
-                            # Take the pole length from the environment
-                            true_length = env.unwrapped.length
+                                        # Take the pole length from the environment
+                                        model_length = env.unwrapped.length
 
-                            # Change the pole length in simulation
-                            env_length = ratio * true_length
-                            env.unwrapped.length = env_length
-                                                        
-                            if controller == 'mpc':
-                                mpc = MPCController(horizon=h, dt = dt, recompute_every=e, 
-                                                model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma)
-                            elif controller == 'predictive':
-                                mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, dt=dt, recompute_every=e,
-                                                model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
-                            elif controller == 'random':
-                                mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, dt=dt, recompute_every=e,
-                                                model_length=true_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
+                                        # Change the pole length in the env
+                                        env_length = ratio * model_length
+                                        env.unwrapped.length = env_length
+
+                                        # Change the gravity in the model
+                                        model_gravity = env.unwrapped.gravity*gravity_ratio
+
+                                        # Change the masscart in the model
+                                        model_masscart = env.unwrapped.masscart*masscart_ratio
+
+                                        # Change the masspole in the model
+                                        model_masspole = env.unwrapped.masspole*masspole_ratio
+                                                                    
+                                        if controller == 'mpc':
+                                            mpc = MPCController(horizon=h, dt = dt, recompute_every=e, 
+                                                            model_length=model_length, model_gravity=model_gravity, model_masscart=model_masscart, model_masspole=model_masspole, wind_mu=wind_mu, wind_sigma=wind_sigma)
+                                        elif controller == 'predictive':
+                                            mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, dt=dt, recompute_every=e,
+                                                            model_length=model_length, model_gravity=model_gravity, model_masscart=model_masscart, model_masspole=model_masspole, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
+                                        elif controller == 'random':
+                                            mpc = SamplingController(controller=controller, world_model=world_model, horizon=h, dt=dt, recompute_every=e,
+                                                            model_length=model_length, model_gravity=model_gravity, model_masscart=model_masscart, model_masspole=model_masspole, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
 
 
-                            episode_lengths = []
-                            episode_times = []
-                            integrated_errors = []
-                            
-                            for ep in range(num_episodes):
-                                episode_start_time = time.time()
-
-                                # Reset the env with seed
-                                obs, _ = env.reset(seed=seed + ep)
-
-                                # Print the env tau and length for verification
-                                print(f"Episode {ep+1}/{num_episodes}: env tau={env.unwrapped.tau}, env length={env.unwrapped.length}")
-
-                                # Change the initial angle
-                                new_state = obs.copy()
-                                new_state[2] += init_angle
-                                env.unwrapped.state = new_state
-                                obs = new_state
-                               
-                                length, step = 0, 0
-                                done = False
-                                states = []
-
-                                # Initialize the rnn model hidden state if needed
-                                if world_model == 'rnn':
-
-                                    # Initialize the hidden state
-                                    hidden = rnn_model.init_hidden(batch_size=1, device=device)   
-                                else:
-                                    hidden = None
-
-                                while not done and length < episode_length:
-                                    if step % e == 0:
-                                        within_step = 0
-                                        trajectory, predictions = mpc.get_action(obs, env, hidden)
-                                        trajectory = trajectory.flatten()
-                                    else:
-                                        within_step += 1
-                                    
-                                    action = trajectory[within_step]
-
-                                    action = np.array([np.clip(action, -3.0, 3.0)]) 
-
-                                    # Make action discrete
-                                    if action >= 0:
-                                        action = 1
-                                    else:
-                                        action = 0
-                                    
-                                    obs, _, done, _, _ = env.step(action)
-
-                                    # Add disturbance to the observation
-                                    wind_disturbance = np.zeros(obs.shape)
-                                    wind_disturbance[2] += np.random.normal(wind_mu, wind_sigma)  # Extra noise on theta
-                                    obs += wind_disturbance
-                                    env.unwrapped.state = obs
+                                        episode_lengths = []
+                                        episode_times = []
+                                        integrated_errors = []
                                         
-                                    states.append(obs)
-                                    step += 1
-                                    length += 1
+                                        for ep in range(num_episodes):
+                                            episode_start_time = time.time()
 
-                                    # Get the hidden state for next step if RNN
-                                    if world_model == 'rnn' and rnn_model is not None:
-                                        # Convert discrete action to one-hot encoding (2D for CartPole)
-                                        action_onehot = np.zeros(2, dtype=np.float32)
-                                        action_onehot[action] = 1
+                                            # Reset the env with seed
+                                            obs, _ = env.reset(seed=seed + ep)
+
+                                            # Print the env tau and length for verification
+                                            print(f"Episode {ep+1}/{num_episodes}: env tau={env.unwrapped.tau}, env length={env.unwrapped.length}")
+
+                                            # Change the initial angle
+                                            new_state = obs.copy()
+                                            new_state[2] += init_angle
+                                            env.unwrapped.state = new_state
+                                            obs = new_state
                                         
-                                        # Convert to tensors with proper shape (batch=1, seq_len=1, dim)
-                                        state_tensor = torch.from_numpy(obs).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 4)
-                                        action_tensor = torch.from_numpy(action_onehot).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 2)
+                                            length, step = 0, 0
+                                            done = False
+                                            states = []
+
+                                            # Initialize the rnn model hidden state if needed
+                                            if world_model == 'rnn':
+
+                                                # Initialize the hidden state
+                                                hidden = rnn_model.init_hidden(batch_size=1, device=device)   
+                                            else:
+                                                hidden = None
+
+                                            while not done and length < episode_length:
+                                                if step % e == 0:
+                                                    within_step = 0
+                                                    trajectory, predictions = mpc.get_action(obs, env, hidden)
+                                                    trajectory = trajectory.flatten()
+                                                else:
+                                                    within_step += 1
+                                                
+                                                action = trajectory[within_step]
+
+                                                # Make action discrete
+                                                if action >= 0:
+                                                    action = 1
+                                                else:
+                                                    action = 0
+                                                
+                                                obs, _, done, _, _ = env.step(action)
+
+                                                # Add disturbance to the observation
+                                                wind_disturbance = np.zeros(obs.shape)
+                                                wind_disturbance[2] += np.random.normal(wind_mu, wind_sigma)  # Extra noise on theta
+                                                obs += wind_disturbance
+                                                env.unwrapped.state = obs
+                                                    
+                                                states.append(obs)
+                                                step += 1
+                                                length += 1
+
+                                                # Get the hidden state for next step if RNN
+                                                if world_model == 'rnn' and rnn_model is not None:
+                                                    # Convert discrete action to one-hot encoding (2D for CartPole)
+                                                    action_onehot = np.zeros(2, dtype=np.float32)
+                                                    action_onehot[action] = 1
+                                                    
+                                                    # Convert to tensors with proper shape (batch=1, seq_len=1, dim)
+                                                    state_tensor = torch.from_numpy(obs).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 4)
+                                                    action_tensor = torch.from_numpy(action_onehot).unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 2)
+                                                    
+                                                    # Forward pass
+                                                    with torch.no_grad():
+                                                        outputs = rnn_model(state_tensor, action_tensor, hidden)
+                                                
+                                                    # Update the hidden state
+                                                    hidden = outputs['hidden']
+                                            
+                                            episode_end_time = time.time()
+                                            episode_time = episode_end_time - episode_start_time
+                                            
+                                            episode_lengths.append(length)
+                                            episode_times.append(episode_time)
+                                            states_squared = np.square(states)
+                                            integrated_errors.append(np.sum(states_squared, axis=0))
+                                            env.close()
+
+                                        end_time = time.time()
+                                        total_evaluation_time = end_time - start_time
+                                        avg_episode_time = np.mean(episode_times)
                                         
-                                        # Forward pass
-                                        with torch.no_grad():
-                                            outputs = rnn_model(state_tensor, action_tensor, hidden)
-                                    
-                                        # Update the hidden state
-                                        hidden = outputs['hidden']
-                                
-                                episode_end_time = time.time()
-                                episode_time = episode_end_time - episode_start_time
-                                
-                                episode_lengths.append(length)
-                                episode_times.append(episode_time)
-                                states_squared = np.square(states)
-                                integrated_errors.append(np.sum(states_squared, axis=0))
-                                env.close()
+                                        config_data = {
+                                            'parameters': {
+                                                'controller': controller,
+                                                'world_model': world_model,
+                                                'horizon': h,
+                                                'recompute_interval': e,
+                                                'length_ratio': ratio,
+                                                'gravity_ratio': gravity_ratio,
+                                                'masscart_ratio': masscart_ratio,
+                                                'masspole_ratio': masspole_ratio,
+                                                'wind_mu': wind_mu,
+                                                'wind_sigma': wind_sigma,
+                                                'init_angle': init_angle,
+                                                'episode_length': episode_length,
+                                                'num_episodes': num_episodes,
+                                                'seed': seed
+                                            },
+                                            'results': {
+                                                'episode_lengths': episode_lengths,
+                                                'episode_times': episode_times,
+                                                'integrated_errors': integrated_errors,
+                                                'avg_episode_time': avg_episode_time,
+                                                'total_evaluation_time': total_evaluation_time
+                                            },
+                                            'statistics': {
+                                                'mean_episode_length': np.mean(episode_lengths),
+                                                'std_episode_length': np.std(episode_lengths),
+                                                'mean_episode_time': avg_episode_time,
+                                                'std_episode_time': np.std(episode_times)
+                                            }
+                                        }
 
-                            end_time = time.time()
-                            total_evaluation_time = end_time - start_time
-                            avg_episode_time = np.mean(episode_times)
-                            
-                            config_data = {
-                                'parameters': {
-                                    'controller': controller,
-                                    'world_model': world_model,
-                                    'horizon': h,
-                                    'recompute_interval': e,
-                                    'length_ratio': ratio,
-                                    'wind_mu': wind_mu,
-                                    'wind_sigma': wind_sigma,
-                                    'init_angle': init_angle,
-                                    'episode_length': episode_length,
-                                    'num_episodes': num_episodes,
-                                    'seed': seed
-                                },
-                                'results': {
-                                    'episode_lengths': episode_lengths,
-                                    'episode_times': episode_times,
-                                    'integrated_errors': integrated_errors,
-                                    'avg_episode_time': avg_episode_time,
-                                    'total_evaluation_time': total_evaluation_time
-                                },
-                                'statistics': {
-                                    'mean_episode_length': np.mean(episode_lengths),
-                                    'std_episode_length': np.std(episode_lengths),
-                                    'mean_episode_time': avg_episode_time,
-                                    'std_episode_time': np.std(episode_times)
-                                }
-                            }
-
-                            filename = f"mpc__cont{controller}_model{world_model}_h{h}_e{e}_r{ratio:.1f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
-                            filepath = os.path.join(results_folder, filename)
-                            
-                            with open(filepath, 'wb') as f:
-                                pickle.dump(config_data, f)
-                            
-                            overall_timing.append({
-                                "controller": controller,
-                                "world_model": world_model,
-                                "horizon": h,
-                                "recompute_interval": e,
-                                "length_ratio": ratio,
-                                "wind_mu": wind_mu,
-                                "wind_sigma": wind_sigma,
-                                "init_angle": init_angle,
-                                "total_evaluation_time": total_evaluation_time,
-                                "avg_episode_time": avg_episode_time
-                            })
+                                        filename = f"mpc__cont{controller}_model{world_model}_h{h}_e{e}_r{ratio:.1f}_gravity{gravity_ratio:.2f}_masscart{masscart_ratio:.2f}_masspole{masspole_ratio:.2f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
+                                        filepath = os.path.join(results_folder, filename)
+                                        
+                                        with open(filepath, 'wb') as f:
+                                            pickle.dump(config_data, f)
+                                        
+                                        overall_timing.append({
+                                            "controller": controller,
+                                            "world_model": world_model,
+                                            "horizon": h,
+                                            "recompute_interval": e,
+                                            "length_ratio": ratio,
+                                            "gravity_ratio": gravity_ratio,
+                                            "masscart_ratio": masscart_ratio,
+                                            "masspole_ratio": masspole_ratio,
+                                            "wind_mu": wind_mu,
+                                            "wind_sigma": wind_sigma,
+                                            "init_angle": init_angle,
+                                            "total_evaluation_time": total_evaluation_time,
+                                            "avg_episode_time": avg_episode_time
+                                        })
 
     timing_df = pd.DataFrame(overall_timing)
     timing_path = os.path.join(results_folder, "evaluation_timing_summary.csv")
     timing_df.to_csv(timing_path, index=False)
     
     return
+
 
 def calculate_cost_error(controller_type, true_state, predicted_state, action):
     """Calculate cost prediction error."""
@@ -834,7 +853,7 @@ def calculate_cost_error(controller_type, true_state, predicted_state, action):
 import time
 
 def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='dynamics', horizon=10, dt=0.02, 
-                                 recompute_every=1, ratio=0.5, wind_mu=0.0, wind_sigma=0.0,
+                                 recompute_every=1, length_ratio=0.5, gravity_ratio=1.0, masscart_ratio=1.0, masspole_ratio=1.0, wind_mu=0.0, wind_sigma=0.0,
                                  episode_length=500, seed=42, init_angle=0.0, adaptive_recompute=False, adaptive_window=20):
     """
     Run a single episode with the specified controller and plot angle and actions over time.
@@ -874,8 +893,17 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
     
     # Change the pole length in simulation
     model_length = env.unwrapped.length
-    env_length = ratio * model_length
+    env_length = length_ratio * model_length
     env.unwrapped.length = env_length
+
+    # Change the gravity in the model
+    model_gravity = env.unwrapped.gravity*gravity_ratio
+
+    # Change the masscart in the model
+    model_masscart = env.unwrapped.masscart*masscart_ratio
+
+    # Change the masspole in the model
+    model_masspole = env.unwrapped.masspole*masspole_ratio
     
     # Initialize adaptive recompute parameters
     current_recompute = recompute_every  # Start with initial value
@@ -887,18 +915,13 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
     # Initialize the controller
     if controller_type == 'mpc':
         controller = MPCController(horizon=horizon, dt=dt, 
-                                 recompute_every=current_recompute, model_length=model_length, 
+                                 recompute_every=current_recompute, model_length=model_length,model_gravity=model_gravity, model_masscart=model_masscart, model_masspole=model_masspole, 
                                  wind_mu=wind_mu, wind_sigma=wind_sigma)
         
     elif controller_type in ['predictive', 'random']:
         controller = SamplingController(controller=controller_type, world_model=world_model, horizon=horizon, dt=dt, 
                                       recompute_every=current_recompute, 
-                                      model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
-    
-    elif controller_type in ['stepsample']:
-        controller = StepSamplingController(controller=controller_type, world_model=world_model, horizon=horizon, dt=dt, 
-                                      recompute_every=recompute_every, 
-                                      model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
+                                      model_length=model_length, model_gravity=model_gravity, model_masscart=model_masscart, model_masspole=model_masspole, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
 
     else:
         raise ValueError("controller_type must be 'mpc', 'predictive', or 'random'")
@@ -930,6 +953,11 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
         hidden = rnn_model.init_hidden(batch_size=1, device=device)
     
     while length < episode_length and not done:  
+
+        # if length is larger than 500
+        # if length > 500:
+        #     env.unwrapped.length = env.unwrapped.length*1.005
+
         # Calculate current running average (what we're actually using for decisions)
         if len(cost_error_buffer) > 0:
             current_running_avg = np.mean(cost_error_buffer)
@@ -1056,7 +1084,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
     ax1.set_xlabel('Time (seconds)')
     ax1.set_ylabel('Angle (radians)')
     title = f'Pole Angle Over Time - {controller_type.upper()} Controller - WORLD Model: {world_model}\n'
-    title += f'H={horizon}, Recompute={recompute_every}{f"(adaptive every {adaptation_window})" if adaptive_recompute else ""}, Length={model_length:.3f}m, Wind σ={wind_sigma:.2f}, Wind μ={wind_mu:.2f}'
+    title += f'H={horizon}, Recompute={recompute_every}{f"(adaptive every {adaptation_window})" if adaptive_recompute else ""}, Length={model_length:.1f}m, Gravity={model_gravity:.2f}m/s², Mass Cart={model_masscart:.2f}kg, Mass Pole={model_masspole:.2f}kg, Wind σ={wind_sigma:.2f}, Wind μ={wind_mu:.2f}'
     ax1.set_title(title)
     ax1.grid(True, alpha=0.3)
     ax1.legend()
@@ -1153,7 +1181,7 @@ def run_single_episode_adaptive_with_plots(controller_type='mpc', world_model='d
     print(f"Steps per second: {length / total_time:.2f}")
 
 def run_single_episode_with_plots(controller_type='mpc', world_model='dynamics', horizon=10, dt=0.02, 
-                                 recompute_every=1, model_length=0.5, wind_mu=0.0, wind_sigma=0.0,
+                                 recompute_every=1, model_length=0.5, model_gravity=9.8, model_masscart=1.0, model_masspole=0.1, wind_mu=0.0, wind_sigma=0.0,
                                  episode_length=500, seed=42, init_angle=0.0):
     """
     Run a single episode with the specified controller and plot angle and actions over time.
@@ -1186,17 +1214,13 @@ def run_single_episode_with_plots(controller_type='mpc', world_model='dynamics',
     # Initialize the controller
     if controller_type == 'mpc':
         controller = MPCController(horizon=horizon, dt=dt, 
-                                 recompute_every=recompute_every, model_length=model_length, 
+                                 recompute_every=recompute_every, model_length=model_length, model_gravity=9.8, model_masscart=1.0, model_masspole=0.1,
                                  wind_mu=wind_mu, wind_sigma=wind_sigma)
         
     elif controller_type in ['predictive', 'random']:
         controller = SamplingController(controller=controller_type, world_model=world_model, horizon=horizon, dt=dt, 
                                       recompute_every=recompute_every, 
-                                      model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
-    elif controller_type in ['stepsample']:
-        controller = StepSamplingController(controller=controller_type, world_model=world_model, horizon=horizon, dt=dt, 
-                                      recompute_every=recompute_every, 
-                                      model_length=model_length, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
+                                      model_length=model_length, model_gravity=9.8, model_masscart=1.0, model_masspole=0.1, wind_mu=wind_mu, wind_sigma=wind_sigma, rnn_model=rnn_model)
 
     else:
         raise ValueError("controller_type must be 'mpc', 'predictive', or 'random'")
@@ -1462,6 +1486,310 @@ def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/",
     print(f"\nPlot saved to: {save_path}")
     plt.show()
 
+def plot_gravity_heatmaps(results_folder="../results/PerformanceResults/", 
+                         controller='mpc',
+                         world_model='dynamics',
+                         gravity_ratios=[0.6, 0.8, 1.0, 1.2, 1.4],
+                         wind_mu=0.0,
+                         wind_sigma=0.0,
+                         init_angle=0.0,
+                         num_episodes=20,
+                         dt=0.02):
+    """Create multiple heatmaps showing horizon × recompute performance for each gravity error ratio."""
+    
+    df = load_results_data(results_folder)
+    
+    if df.empty:
+        print("No data found!")
+        return
+    
+    filtered_data = df[
+        (df['controller'] == controller) &
+        (df['wind_mu'] == wind_mu) & 
+        (df['wind_sigma'] == wind_sigma) &
+        (df['init_angle'] == init_angle) &
+        (df['world_model'] == world_model)
+    ]
+    
+    if filtered_data.empty:
+        print(f"No data found for controller {controller}, wind_mu={wind_mu}, wind_sigma={wind_sigma}, init_angle={init_angle}, world_model={world_model}")
+        return
+    
+    horizons = sorted(filtered_data['horizon'].unique())
+    recomputes = sorted(filtered_data['recompute_interval'].unique())
+    available_ratios = sorted(filtered_data['gravity_ratio'].unique())
+    
+    horizons_sec = [h * dt for h in horizons]
+    recomputes_sec = [r * dt for r in recomputes]
+    
+    plot_ratios = [r for r in gravity_ratios if r in available_ratios]
+    
+    print(f"Found data for horizons: {horizons} steps = {[f'{h:.1f}s' for h in horizons_sec]}")
+    print(f"Found data for recompute intervals: {recomputes} steps = {[f'{r:.2f}s' for r in recomputes_sec]}")
+    print(f"Plotting gravity ratios: {plot_ratios}")
+    
+    fig, axes = plt.subplots(1, len(plot_ratios), figsize=(4*len(plot_ratios)+4, 6))
+    
+    if len(plot_ratios) == 1:
+        axes = [axes]
+    
+    all_performance_sec = filtered_data['mean_episode_length'].values * dt
+    vmin, vmax = np.nanmin(all_performance_sec), np.nanmax(all_performance_sec)
+    
+    for idx, ratio in enumerate(plot_ratios):
+        ratio_data = filtered_data[filtered_data['gravity_ratio'] == ratio]
+        
+        perf_matrix = np.full((len(recomputes), len(horizons)), np.nan)
+        
+        for i, recompute in enumerate(recomputes):
+            for j, horizon in enumerate(horizons):
+                subset = ratio_data[(ratio_data['recompute_interval'] == recompute) & 
+                                  (ratio_data['horizon'] == horizon)]
+                if len(subset) > 0:
+                    perf_matrix[i, j] = subset['mean_episode_length'].iloc[0] * dt
+        
+        im = axes[idx].imshow(perf_matrix, cmap='viridis', aspect='auto', 
+                             vmin=vmin, vmax=vmax, origin='lower')
+        
+        axes[idx].set_xticks(range(len(horizons)))
+        axes[idx].set_xticklabels([f'{h:.1f}' for h in horizons_sec])
+        axes[idx].set_yticks(range(len(recomputes)))
+        axes[idx].set_yticklabels([f'{r:.2f}' for r in recomputes_sec])
+        
+        axes[idx].set_xlabel('Planning Horizon (s)', fontsize=11)
+        if idx == 0:
+            axes[idx].set_ylabel('Recompute Every (s)', fontsize=11)
+        
+        title = f'Ratio = {ratio:.1f}'
+        if ratio == 1.0:
+            title += '\n(Perfect Model)'
+        else:
+            error_pct = abs(ratio - 1.0) * 100
+            direction = "Underestimate" if ratio < 1.0 else "Overestimate"
+            title += f'\n({direction} {error_pct:.0f}%)'
+        
+        axes[idx].set_title(title, fontsize=12, fontweight='bold')
+        
+        for i in range(len(recomputes)):
+            for j in range(len(horizons)):
+                if not np.isnan(perf_matrix[i, j]):
+                    text_color = 'white' if perf_matrix[i, j] < (vmin + vmax) / 2 else 'black'
+                    axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
+                                  ha="center", va="center", 
+                                  color=text_color, fontsize=9, fontweight='bold')
+
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Gravity Error\n(controller={controller}, world_model={world_model}, wind_μ={wind_mu}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+                 fontsize=16, fontweight='bold', y=0.98)
+    
+    plt.tight_layout()
+    save_path = os.path.join(results_folder, f"mpc_gravity_performance_heatmaps_wmu{wind_mu}_wsig{wind_sigma}_iang{init_angle:.2f}.png")
+    plt.savefig(save_path, bbox_inches="tight", dpi=300)
+    print(f"\nPlot saved to: {save_path}")
+    plt.show()
+
+
+def plot_masscart_heatmaps(results_folder="../results/PerformanceResults/", 
+                          controller='mpc',
+                          world_model='dynamics',
+                          masscart_ratios=[0.6, 0.8, 1.0, 1.2, 1.4],
+                          wind_mu=0.0,
+                          wind_sigma=0.0,
+                          init_angle=0.0,
+                          num_episodes=20,
+                          dt=0.02):
+    """Create multiple heatmaps showing horizon × recompute performance for each cart mass error ratio."""
+    
+    df = load_results_data(results_folder)
+    
+    if df.empty:
+        print("No data found!")
+        return
+    
+    filtered_data = df[
+        (df['controller'] == controller) &
+        (df['wind_mu'] == wind_mu) & 
+        (df['wind_sigma'] == wind_sigma) &
+        (df['init_angle'] == init_angle) &
+        (df['world_model'] == world_model)
+    ]
+    
+    if filtered_data.empty:
+        print(f"No data found for controller {controller}, wind_mu={wind_mu}, wind_sigma={wind_sigma}, init_angle={init_angle}, world_model={world_model}")
+        return
+    
+    horizons = sorted(filtered_data['horizon'].unique())
+    recomputes = sorted(filtered_data['recompute_interval'].unique())
+    available_ratios = sorted(filtered_data['masscart_ratio'].unique())
+    
+    horizons_sec = [h * dt for h in horizons]
+    recomputes_sec = [r * dt for r in recomputes]
+    
+    plot_ratios = [r for r in masscart_ratios if r in available_ratios]
+    
+    print(f"Found data for horizons: {horizons} steps = {[f'{h:.1f}s' for h in horizons_sec]}")
+    print(f"Found data for recompute intervals: {recomputes} steps = {[f'{r:.2f}s' for r in recomputes_sec]}")
+    print(f"Plotting cart mass ratios: {plot_ratios}")
+    
+    fig, axes = plt.subplots(1, len(plot_ratios), figsize=(4*len(plot_ratios)+4, 6))
+    
+    if len(plot_ratios) == 1:
+        axes = [axes]
+    
+    all_performance_sec = filtered_data['mean_episode_length'].values * dt
+    vmin, vmax = np.nanmin(all_performance_sec), np.nanmax(all_performance_sec)
+    
+    for idx, ratio in enumerate(plot_ratios):
+        ratio_data = filtered_data[filtered_data['masscart_ratio'] == ratio]
+        
+        perf_matrix = np.full((len(recomputes), len(horizons)), np.nan)
+        
+        for i, recompute in enumerate(recomputes):
+            for j, horizon in enumerate(horizons):
+                subset = ratio_data[(ratio_data['recompute_interval'] == recompute) & 
+                                  (ratio_data['horizon'] == horizon)]
+                if len(subset) > 0:
+                    perf_matrix[i, j] = subset['mean_episode_length'].iloc[0] * dt
+        
+        im = axes[idx].imshow(perf_matrix, cmap='viridis', aspect='auto', 
+                             vmin=vmin, vmax=vmax, origin='lower')
+        
+        axes[idx].set_xticks(range(len(horizons)))
+        axes[idx].set_xticklabels([f'{h:.1f}' for h in horizons_sec])
+        axes[idx].set_yticks(range(len(recomputes)))
+        axes[idx].set_yticklabels([f'{r:.2f}' for r in recomputes_sec])
+        
+        axes[idx].set_xlabel('Planning Horizon (s)', fontsize=11)
+        if idx == 0:
+            axes[idx].set_ylabel('Recompute Every (s)', fontsize=11)
+        
+        title = f'Ratio = {ratio:.1f}'
+        if ratio == 1.0:
+            title += '\n(Perfect Model)'
+        else:
+            error_pct = abs(ratio - 1.0) * 100
+            direction = "Underestimate" if ratio < 1.0 else "Overestimate"
+            title += f'\n({direction} {error_pct:.0f}%)'
+        
+        axes[idx].set_title(title, fontsize=12, fontweight='bold')
+        
+        for i in range(len(recomputes)):
+            for j in range(len(horizons)):
+                if not np.isnan(perf_matrix[i, j]):
+                    text_color = 'white' if perf_matrix[i, j] < (vmin + vmax) / 2 else 'black'
+                    axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
+                                  ha="center", va="center", 
+                                  color=text_color, fontsize=9, fontweight='bold')
+
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Cart Mass Error\n(controller={controller}, world_model={world_model}, wind_μ={wind_mu}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+                 fontsize=16, fontweight='bold', y=0.98)
+    
+    plt.tight_layout()
+    save_path = os.path.join(results_folder, f"mpc_masscart_performance_heatmaps_wmu{wind_mu}_wsig{wind_sigma}_iang{init_angle:.2f}.png")
+    plt.savefig(save_path, bbox_inches="tight", dpi=300)
+    print(f"\nPlot saved to: {save_path}")
+    plt.show()
+
+
+def plot_masspole_heatmaps(results_folder="../results/PerformanceResults/", 
+                          controller='mpc',
+                          world_model='dynamics',
+                          masspole_ratios=[0.6, 0.8, 1.0, 1.2, 1.4],
+                          wind_mu=0.0,
+                          wind_sigma=0.0,
+                          init_angle=0.0,
+                          num_episodes=20,
+                          dt=0.02):
+    """Create multiple heatmaps showing horizon × recompute performance for each pole mass error ratio."""
+    
+    df = load_results_data(results_folder)
+    
+    if df.empty:
+        print("No data found!")
+        return
+    
+    filtered_data = df[
+        (df['controller'] == controller) &
+        (df['wind_mu'] == wind_mu) & 
+        (df['wind_sigma'] == wind_sigma) &
+        (df['init_angle'] == init_angle) &
+        (df['world_model'] == world_model)
+    ]
+    
+    if filtered_data.empty:
+        print(f"No data found for controller {controller}, wind_mu={wind_mu}, wind_sigma={wind_sigma}, init_angle={init_angle}, world_model={world_model}")
+        return
+    
+    horizons = sorted(filtered_data['horizon'].unique())
+    recomputes = sorted(filtered_data['recompute_interval'].unique())
+    available_ratios = sorted(filtered_data['masspole_ratio'].unique())
+    
+    horizons_sec = [h * dt for h in horizons]
+    recomputes_sec = [r * dt for r in recomputes]
+    
+    plot_ratios = [r for r in masspole_ratios if r in available_ratios]
+    
+    print(f"Found data for horizons: {horizons} steps = {[f'{h:.1f}s' for h in horizons_sec]}")
+    print(f"Found data for recompute intervals: {recomputes} steps = {[f'{r:.2f}s' for r in recomputes_sec]}")
+    print(f"Plotting pole mass ratios: {plot_ratios}")
+    
+    fig, axes = plt.subplots(1, len(plot_ratios), figsize=(4*len(plot_ratios)+4, 6))
+    
+    if len(plot_ratios) == 1:
+        axes = [axes]
+    
+    all_performance_sec = filtered_data['mean_episode_length'].values * dt
+    vmin, vmax = np.nanmin(all_performance_sec), np.nanmax(all_performance_sec)
+    
+    for idx, ratio in enumerate(plot_ratios):
+        ratio_data = filtered_data[filtered_data['masspole_ratio'] == ratio]
+        
+        perf_matrix = np.full((len(recomputes), len(horizons)), np.nan)
+        
+        for i, recompute in enumerate(recomputes):
+            for j, horizon in enumerate(horizons):
+                subset = ratio_data[(ratio_data['recompute_interval'] == recompute) & 
+                                  (ratio_data['horizon'] == horizon)]
+                if len(subset) > 0:
+                    perf_matrix[i, j] = subset['mean_episode_length'].iloc[0] * dt
+        
+        im = axes[idx].imshow(perf_matrix, cmap='viridis', aspect='auto', 
+                             vmin=vmin, vmax=vmax, origin='lower')
+        
+        axes[idx].set_xticks(range(len(horizons)))
+        axes[idx].set_xticklabels([f'{h:.1f}' for h in horizons_sec])
+        axes[idx].set_yticks(range(len(recomputes)))
+        axes[idx].set_yticklabels([f'{r:.2f}' for r in recomputes_sec])
+        
+        axes[idx].set_xlabel('Planning Horizon (s)', fontsize=11)
+        if idx == 0:
+            axes[idx].set_ylabel('Recompute Every (s)', fontsize=11)
+        
+        title = f'Ratio = {ratio:.1f}'
+        if ratio == 1.0:
+            title += '\n(Perfect Model)'
+        else:
+            error_pct = abs(ratio - 1.0) * 100
+            direction = "Underestimate" if ratio < 1.0 else "Overestimate"
+            title += f'\n({direction} {error_pct:.0f}%)'
+        
+        axes[idx].set_title(title, fontsize=12, fontweight='bold')
+        
+        for i in range(len(recomputes)):
+            for j in range(len(horizons)):
+                if not np.isnan(perf_matrix[i, j]):
+                    text_color = 'white' if perf_matrix[i, j] < (vmin + vmax) / 2 else 'black'
+                    axes[idx].text(j, i, f'{round(perf_matrix[i, j])}',
+                                  ha="center", va="center", 
+                                  color=text_color, fontsize=9, fontweight='bold')
+
+    fig.suptitle(f'MPC Performance: Horizon × Recompute × Pole Mass Error\n(controller={controller}, world_model={world_model}, wind_μ={wind_mu}, wind_σ={wind_sigma}, init_angle={init_angle:.2f}, N={num_episodes} episodes)', 
+                 fontsize=16, fontweight='bold', y=0.98)
+    
+    plt.tight_layout()
+    save_path = os.path.join(results_folder, f"mpc_masspole_performance_heatmaps_wmu{wind_mu}_wsig{wind_sigma}_iang{init_angle:.2f}.png")
+    plt.savefig(save_path, bbox_inches="tight", dpi=300)
+    print(f"\nPlot saved to: {save_path}")
+    plt.show()
 
 def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/", 
                          controller='mpc',
