@@ -1518,7 +1518,7 @@ def plot_gravity_heatmaps(results_folder="../results/PerformanceResults/",
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
         (df['world_model'] == world_model) &
-        (df['pole_length_ratio'] == pole_length_ratio) &
+        (df['length_ratio'] == pole_length_ratio) &
         (df['masscart_ratio'] == masscart_ratio) &
         (df['masspole_ratio'] == masspole_ratio)
     ]
@@ -1626,7 +1626,7 @@ def plot_masscart_heatmaps(results_folder="../results/PerformanceResults/",
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
         (df['world_model'] == world_model) &
-        (df['pole_length_ratio'] == pole_length_ratio) &
+        (df['length_ratio'] == pole_length_ratio) &
         (df['gravity_ratio'] == gravity_ratio) &
         (df['masspole_ratio'] == masspole_ratio)
     ]
@@ -1734,7 +1734,7 @@ def plot_masspole_heatmaps(results_folder="../results/PerformanceResults/",
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
         (df['world_model'] == world_model) &
-        (df['pole_length_ratio'] == pole_length_ratio) &
+        (df['length_ratio'] == pole_length_ratio) &
         (df['gravity_ratio'] == gravity_ratio) &
         (df['masscart_ratio'] == masscart_ratio)
     ]
@@ -1837,7 +1837,7 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
     
     filtered_data = df[
         (df['controller'] == controller) &
-        (df['pole_length_ratio'] == pole_length_ratio) & 
+        (df['length_ratio'] == pole_length_ratio) & 
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
         (df['world_model'] == world_model) &
