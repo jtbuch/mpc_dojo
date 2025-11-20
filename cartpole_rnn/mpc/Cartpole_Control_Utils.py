@@ -1393,6 +1393,9 @@ def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/",
                                 wind_sigma=0.0,
                                 init_angle=0.0,
                                 num_episodes=20,
+                                gravity_ratio=1.0,
+                                masscart_ratio=1.0,
+                                masspole_ratio=1.0,
                                 dt=0.02):
     """Create multiple heatmaps showing horizon × recompute performance for each pole error ratio."""
     
@@ -1407,7 +1410,10 @@ def plot_pole_angle_heatmaps(results_folder="../results/PerformanceResults/",
         (df['wind_mu'] == wind_mu) & 
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
-        (df['world_model'] == world_model)
+        (df['world_model'] == world_model) &
+        (df['gravity_ratio'] == gravity_ratio) &
+        (df['masscart_ratio'] == masscart_ratio) &
+        (df['masspole_ratio'] == masspole_ratio)
     ]
     
     if filtered_data.empty:
@@ -1494,6 +1500,9 @@ def plot_gravity_heatmaps(results_folder="../results/PerformanceResults/",
                          wind_sigma=0.0,
                          init_angle=0.0,
                          num_episodes=20,
+                         pole_length_ratio=1.0,
+                         masscart_ratio=1.0,
+                         masspole_ratio=1.0,
                          dt=0.02):
     """Create multiple heatmaps showing horizon × recompute performance for each gravity error ratio."""
     
@@ -1508,7 +1517,10 @@ def plot_gravity_heatmaps(results_folder="../results/PerformanceResults/",
         (df['wind_mu'] == wind_mu) & 
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
-        (df['world_model'] == world_model)
+        (df['world_model'] == world_model) &
+        (df['pole_length_ratio'] == pole_length_ratio) &
+        (df['masscart_ratio'] == masscart_ratio) &
+        (df['masspole_ratio'] == masspole_ratio)
     ]
     
     if filtered_data.empty:
@@ -1596,6 +1608,9 @@ def plot_masscart_heatmaps(results_folder="../results/PerformanceResults/",
                           wind_sigma=0.0,
                           init_angle=0.0,
                           num_episodes=20,
+                          pole_length_ratio=1.0,
+                          gravity_ratio=1.0,
+                          masspole_ratio=1.0,
                           dt=0.02):
     """Create multiple heatmaps showing horizon × recompute performance for each cart mass error ratio."""
     
@@ -1610,7 +1625,10 @@ def plot_masscart_heatmaps(results_folder="../results/PerformanceResults/",
         (df['wind_mu'] == wind_mu) & 
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
-        (df['world_model'] == world_model)
+        (df['world_model'] == world_model) &
+        (df['pole_length_ratio'] == pole_length_ratio) &
+        (df['gravity_ratio'] == gravity_ratio) &
+        (df['masspole_ratio'] == masspole_ratio)
     ]
     
     if filtered_data.empty:
@@ -1698,6 +1716,9 @@ def plot_masspole_heatmaps(results_folder="../results/PerformanceResults/",
                           wind_sigma=0.0,
                           init_angle=0.0,
                           num_episodes=20,
+                          pole_length_ratio=1.0,
+                          gravity_ratio=1.0,
+                          masscart_ratio=1.0,
                           dt=0.02):
     """Create multiple heatmaps showing horizon × recompute performance for each pole mass error ratio."""
     
@@ -1712,7 +1733,10 @@ def plot_masspole_heatmaps(results_folder="../results/PerformanceResults/",
         (df['wind_mu'] == wind_mu) & 
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
-        (df['world_model'] == world_model)
+        (df['world_model'] == world_model) &
+        (df['pole_length_ratio'] == pole_length_ratio) &
+        (df['gravity_ratio'] == gravity_ratio) &
+        (df['masscart_ratio'] == masscart_ratio)
     ]
     
     if filtered_data.empty:
@@ -1795,7 +1819,10 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
                          controller='mpc',
                          world_model='dynamics',
                          wind_mus=[0.0, 0.5, 1.0, 1.5, 2.0],
-                         length_ratio=1.0,
+                         pole_length_ratio=1.0,
+                         gravity_ratio=1.0,
+                         masscart_ratio=1.0,
+                         masspole_ratio=1.0,
                          wind_sigma=0.0,
                          init_angle=0.0,
                          num_episodes=20,
@@ -1810,14 +1837,17 @@ def plot_wind_mu_heatmaps(results_folder="../results/PerformanceResults/",
     
     filtered_data = df[
         (df['controller'] == controller) &
-        (df['length_ratio'] == length_ratio) & 
+        (df['pole_length_ratio'] == pole_length_ratio) & 
         (df['wind_sigma'] == wind_sigma) &
         (df['init_angle'] == init_angle) &
-        (df['world_model'] == world_model)
+        (df['world_model'] == world_model) &
+        (df['gravity_ratio'] == gravity_ratio) &
+        (df['masscart_ratio'] == masscart_ratio) &
+        (df['masspole_ratio'] == masspole_ratio)
     ]
     
     if filtered_data.empty:
-        print(f"No data found for ratio={length_ratio}, sigma={wind_sigma}, init_angle={init_angle}, world_model={world_model}")
+        print(f"No data found for ratio={pole_length_ratio}, sigma={wind_sigma}, init_angle={init_angle}, world_model={world_model}")
         return
     
     horizons = sorted(filtered_data['horizon'].unique())
