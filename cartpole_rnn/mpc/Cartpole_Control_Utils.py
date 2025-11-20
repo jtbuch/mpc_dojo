@@ -643,7 +643,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
             for wind_sigma in wind_sigmas:
                 for h in horizons:
                     for e in recompute_intervals:
-                        for pole_ratio in length_ratios:
+                        for pole_length_ratio in length_ratios:
                             for gravity_ratio in gravity_ratios:
                                 for masscart_ratio in masscart_ratios:
                                     for masspole_ratio in masspole_ratios:
@@ -657,7 +657,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                         env.unwrapped.tau = dt
 
                                         # Take the pole length from the environment
-                                        model_length = env.unwrapped.length*pole_ratio
+                                        model_length = env.unwrapped.length*pole_length_ratio
 
                                         # Change the pole length in the env
                                         # env_length = ratio * model_length
@@ -778,7 +778,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                                 'world_model': world_model,
                                                 'horizon': h,
                                                 'recompute_interval': e,
-                                                'length_ratio': ratio,
+                                                'length_ratio': pole_length_ratio,
                                                 'gravity_ratio': gravity_ratio,
                                                 'masscart_ratio': masscart_ratio,
                                                 'masspole_ratio': masspole_ratio,
@@ -804,7 +804,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                             }
                                         }
 
-                                        filename = f"mpc__cont{controller}_model{world_model}_h{h}_e{e}_r{ratio:.1f}_gravity{gravity_ratio:.2f}_masscart{masscart_ratio:.2f}_masspole{masspole_ratio:.2f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
+                                        filename = f"mpc__cont{controller}_model{world_model}_h{h}_e{e}_r{pole_length_ratio:.1f}_gravity{gravity_ratio:.2f}_masscart{masscart_ratio:.2f}_masspole{masspole_ratio:.2f}_wmu{wind_mu:.2f}_wsig{wind_sigma:.2f}_iang{init_angle:.2f}.pkl"
                                         filepath = os.path.join(results_folder, filename)
                                         
                                         with open(filepath, 'wb') as f:
@@ -815,7 +815,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                             "world_model": world_model,
                                             "horizon": h,
                                             "recompute_interval": e,
-                                            "length_ratio": ratio,
+                                            "length_ratio": pole_length_ratio,
                                             "gravity_ratio": gravity_ratio,
                                             "masscart_ratio": masscart_ratio,
                                             "masspole_ratio": masspole_ratio,
