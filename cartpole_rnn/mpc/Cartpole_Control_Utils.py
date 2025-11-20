@@ -643,7 +643,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
             for wind_sigma in wind_sigmas:
                 for h in horizons:
                     for e in recompute_intervals:
-                        for ratio in length_ratios:
+                        for pole_ratio in length_ratios:
                             for gravity_ratio in gravity_ratios:
                                 for masscart_ratio in masscart_ratios:
                                     for masspole_ratio in masspole_ratios:
@@ -657,7 +657,7 @@ def evaluate_mpc_controllers(controller, world_model, horizons, recompute_interv
                                         env.unwrapped.tau = dt
 
                                         # Take the pole length from the environment
-                                        model_length = env.unwrapped.length*gravity_ratio
+                                        model_length = env.unwrapped.length*pole_ratio
 
                                         # Change the pole length in the env
                                         # env_length = ratio * model_length
